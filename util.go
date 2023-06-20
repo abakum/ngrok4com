@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"runtime/debug"
@@ -11,6 +13,21 @@ import (
 
 	"github.com/ngrok/ngrok-api-go/v5"
 	"github.com/ngrok/ngrok-api-go/v5/tunnels"
+)
+
+const (
+	ansiReset = "\u001B[0m"
+	ansiRedBG = "\u001B[41m"
+	BUG       = ansiRedBG + "Ж" + ansiReset
+)
+
+var (
+	letf = log.New(os.Stdout, BUG, log.Ltime|log.Lshortfile)
+	ltf  = log.New(os.Stdout, " ", log.Ltime|log.Lshortfile)
+	let  = log.New(os.Stdout, BUG, log.Ltime)
+	lt   = log.New(os.Stdout, " ", log.Ltime)
+	//go:embed NGROK_API_KEY.txt
+	NGROK_API_KEY string
 )
 
 // Get source of code

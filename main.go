@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -18,29 +17,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	ansiReset = "\u001B[0m"
-	ansiRedBG = "\u001B[41m"
-	BUG       = ansiRedBG + "Ж" + ansiReset
-)
-
 var (
-	letf    = log.New(os.Stdout, BUG, log.Ltime|log.Lshortfile)
-	ltf     = log.New(os.Stdout, " ", log.Ltime|log.Lshortfile)
-	let     = log.New(os.Stdout, BUG, log.Ltime)
-	lt      = log.New(os.Stdout, " ", log.Ltime)
-	hub4com = `..\hub4com\hub4com.exe`
-	com     = "7"
-	port    = "7000"
-	//go:embed NGROK_API_KEY.txt
-	NGROK_API_KEY string
 	//go:embed NGROK_AUTHTOKEN.txt
 	NGROK_AUTHTOKEN string
 )
 
 func main() {
 	var (
-		err error
+		err     error
+		hub4com = `..\hub4com\hub4com.exe`
+		com     = "7"
+		port    = "7000"
 	)
 	defer closer.Close()
 
@@ -52,6 +39,14 @@ func main() {
 		fmt.Scanln()
 	})
 
+	if len(os.Args) > 1 {
+		com = os.Args[1]
+	}
+
+	if len(os.Args) > 2 {
+		port = os.Args[2]
+	}
+
 	cwd, err := os.Getwd()
 	if err == nil {
 		hub4com = filepath.Join(cwd, hub4com)
@@ -62,6 +57,7 @@ func main() {
 		err = Errorf("found online client: %s", forwardsTo)
 		return
 	}
+	err = nil
 
 	hub := exec.Command(
 		hub4com,
@@ -116,10 +112,7 @@ func run(ctx context.Context, dest string) error {
 
 		ltf.Println("accepted connection from", conn.RemoteAddr())
 
-		go func() {
-			err := handleConn(ctx, dest, conn)
-			PrintOk("connection closed:", err)
-		}()
+		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
 	}
 }
 
