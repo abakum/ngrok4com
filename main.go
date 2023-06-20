@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/xlab/closer"
 	"golang.ngrok.com/ngrok"
@@ -23,7 +24,7 @@ const (
 )
 
 var (
-	// letf    = log.New(os.Stdout, BUG, log.Ltime|log.Lshortfile)
+	letf    = log.New(os.Stdout, BUG, log.Ltime|log.Lshortfile)
 	ltf     = log.New(os.Stdout, " ", log.Ltime|log.Lshortfile)
 	let     = log.New(os.Stdout, BUG, log.Ltime)
 	lt      = log.New(os.Stdout, " ", log.Ltime)
@@ -79,15 +80,17 @@ func main() {
 	)
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
-	err = hub.Start()
-	if err != nil {
-		err = srcError(err)
-		return
-	}
 	closer.Bind(func() {
 		PrintOk("hub4com", hub.Process.Kill())
 	})
-
+	go func() {
+		err = hub.Run()
+		if err != nil {
+			letf.Println(err)
+			closer.Close()
+		}
+	}()
+	time.Sleep(time.Second)
 	PrintOk("ngrok", run(context.Background(), "127.0.0.1:"+port))
 }
 
@@ -98,7 +101,7 @@ func run(ctx context.Context, dest string) error {
 		ngrok.WithAuthtoken(Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN)),
 	)
 	if err != nil {
-		return err
+		return srcError(err)
 	}
 
 	ltf.Println("tunnel created:", tun.URL())
@@ -106,14 +109,14 @@ func run(ctx context.Context, dest string) error {
 	for {
 		conn, err := tun.Accept()
 		if err != nil {
-			return err
+			return srcError(err)
 		}
 
 		ltf.Println("accepted connection from", conn.RemoteAddr())
 
 		go func() {
 			err := handleConn(ctx, dest, conn)
-			ltf.Println("connection closed:", err)
+			PrintOk("connection closed:", err)
 		}()
 	}
 }
@@ -121,18 +124,18 @@ func run(ctx context.Context, dest string) error {
 func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	next, err := net.Dial("tcp", dest)
 	if err != nil {
-		return err
+		return srcError(err)
 	}
 
 	g, _ := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		_, err := io.Copy(next, conn)
-		return err
+		return srcError(err)
 	})
 	g.Go(func() error {
 		_, err := io.Copy(conn, next)
-		return err
+		return srcError(err)
 	})
 
 	return g.Wait()
