@@ -37,6 +37,9 @@ func Errorf(format string, args ...any) error {
 
 // Wrap source of code and error to error
 func srcError(err error) error {
+	if err == nil {
+		return nil
+	}
 	return fmt.Errorf(src(8)+" %w", err)
 }
 
