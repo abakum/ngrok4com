@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -48,6 +49,7 @@ func main() {
 			let.Println(err)
 			defer os.Exit(1)
 		}
+		fmt.Scanln()
 	})
 
 	cwd, err := os.Getwd()
