@@ -114,7 +114,7 @@ func main() {
 		`\\.\COM`+com,
 
 		"--use-driver=tcp",
-		"*"+port,
+		port,
 	)
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
@@ -175,20 +175,40 @@ func run(ctx context.Context, dest string) error {
 	}
 }
 
+func handleConn_(ctx context.Context, dest string, conn net.Conn) error {
+	next, err := net.Dial("tcp", dest)
+	if err != nil {
+		return srcError(err)
+	}
+	done := make(chan error, 2)
+	go func() {
+		_, err := io.Copy(next, conn)
+		next.Close()
+		done <- srcError(err)
+	}()
+	go func() {
+		_, err := io.Copy(conn, next)
+		conn.Close()
+		done <- srcError(err)
+	}()
+	return <-done
+}
+
 func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	next, err := net.Dial("tcp", dest)
 	if err != nil {
 		return srcError(err)
 	}
-
 	g, _ := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		_, err := io.Copy(next, conn)
+		next.Close()
 		return srcError(err)
 	})
 	g.Go(func() error {
 		_, err := io.Copy(conn, next)
+		conn.Close()
 		return srcError(err)
 	})
 
