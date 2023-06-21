@@ -5,6 +5,9 @@ go 1.20
 require github.com/ngrok/ngrok-api-go/v5 v5.0.0
 
 require (
+	github.com/creack/goselect v0.1.2 // indirect
+	github.com/daviddengcn/go-colortext v0.0.0-20180409174941-186a3d44e920 // indirect
+	github.com/dixonwille/wlog/v3 v3.0.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/inconshreveable/log15 v3.0.0-testing.3+incompatible // indirect
 	github.com/inconshreveable/log15/v3 v3.0.0-testing.5 // indirect
@@ -20,7 +23,9 @@ require (
 )
 
 require (
-	github.com/xlab/closer v1.1.0 // indirect
+	github.com/dixonwille/wmenu/v5 v5.1.0
+	github.com/xlab/closer v1.1.0
+	go.bug.st/serial v1.5.0
 	golang.ngrok.com/ngrok v1.3.0
 	golang.org/x/sync v0.3.0
 )
