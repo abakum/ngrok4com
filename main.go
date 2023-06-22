@@ -23,6 +23,8 @@ import (
 var (
 	//go:embed NGROK_AUTHTOKEN.txt
 	NGROK_AUTHTOKEN string
+	//go:embed NGROK_API_KEY.txt
+	NGROK_API_KEY string
 )
 
 func main() {
@@ -32,7 +34,16 @@ func main() {
 		ngrokBin = `..\ngrok\ngrok.exe`
 		com      = "7"
 		port     = "7000"
+		crypt    = "--data=8"
 	)
+	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
+	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
+	// NGROK_AUTHTOKEN = ""                                   // emulate local mode
+	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY) //if emty then no crypt
+	// NGROK_API_KEY = ""                                     // emulate no crypt
+	if NGROK_API_KEY != "" {
+		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
+	}
 	defer closer.Close()
 
 	closer.Bind(func() {
@@ -59,13 +70,6 @@ func main() {
 		ngrokBin = filepath.Join(cwd, ngrokBin)
 	}
 
-	_, forwardsTo, err := ngrokAPI()
-	if err == nil {
-		err = Errorf("found online client: %s", forwardsTo)
-		return
-	}
-	err = nil
-
 	menu := wmenu.NewMenu("Choose serial port")
 	menu.Action(func(opts []wmenu.Opt) error {
 		com = opts[0].Value.(string)
@@ -78,7 +82,7 @@ func main() {
 	}
 	for _, sPort := range ports {
 		s := fmt.Sprintf("%s %s", sPort.Name, sPort.Product)
-		ltf.Println(s)
+		lt.Println(s)
 		if !strings.Contains(sPort.Product, "com0com - serial port emulator") {
 			suff := strings.TrimPrefix(sPort.Name, "COM")
 			menu.Option(s, suff, suff == com, nil)
@@ -94,7 +98,7 @@ func main() {
 
 	hub := exec.Command(
 		hub4com,
-		"--interface=127.0.0.1",
+		// "--interface=127.0.0.1",
 		"--baud=460800",
 
 		"--create-filter=escparse,com,parse",
@@ -107,7 +111,7 @@ func main() {
 		"--create-filter=lsrmap,tcp,lsrmap",
 		"--create-filter=pinmap,tcp,pinmap:--cts=cts --dsr=dsr --dcd=dcd --ring=ring",
 		"--create-filter=linectl,tcp,lc:--br=local --lc=local",
-		"--create-filter=crypt,tcp,crypt:--secret="+NGROK_API_KEY,
+		crypt,
 		"--add-filters=1:tcp",
 
 		"--octs=off",
@@ -131,8 +135,20 @@ func main() {
 		}
 	}()
 	time.Sleep(time.Second)
+
+	if NGROK_AUTHTOKEN == "" {
+		planB(Errorf("empty NGROK_AUTHTOKEN"))
+		return
+	}
+
+	_, forwardsTo, err := ngrokAPI()
+	if err == nil {
+		planB(Errorf("found online client: %s", forwardsTo))
+		return
+	}
+	err = nil
+
 	if false {
-		// Allowed stoping from https://dashboard.ngrok.com/tunnels/agents
 		ngr := exec.Command(
 			// "cmd", "/c", "start", // show window of ngrok client for debug
 			ngrokBin,
@@ -147,22 +163,69 @@ func main() {
 		})
 		err = srcError(ngr.Run())
 	} else {
-		ltf.Println(ngrokBin)
+		_ = ngrokBin
 		err = run(context.Background(), ":"+port)
+	}
+	if err != nil {
+		if strings.Contains(err.Error(), "exit status 1") ||
+			strings.Contains(err.Error(), "ERR_NGROK_105") {
+			planB(err)
+			err = nil
+		}
+	}
+}
+
+func planB(err error) {
+	defer closer.Hold()
+	let.Println(err)
+	lt.Println("Plan B: say IP for connect tty without internet")
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return
+	}
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			return
+		}
+		for _, addr := range addrs {
+			if strings.HasPrefix(addr.String(), "::") {
+				continue
+			}
+			if strings.HasPrefix(addr.String(), "127.") {
+				continue
+			}
+			lt.Println(addr)
+		}
 	}
 }
 
 // https://github.com/ngrok/ngrok-go/blob/main/examples/ngrok-lite/main.go
 func run(ctx context.Context, dest string) error {
+	ctxWT, caWT := context.WithTimeout(ctx, time.Second)
+	defer caWT()
+	sess, err := ngrok.Connect(ctxWT,
+		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
+	)
+	if err != nil {
+		return Errorf("Connect %w", err)
+	}
+	sess.Close()
+
 	ctx, ca := context.WithCancel(ctx)
+	defer func() {
+		if err != nil {
+			ca()
+		}
+	}()
+
 	tun, err := ngrok.Listen(ctx,
 		config.TCPEndpoint(),
-		ngrok.WithAuthtoken(Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN)),
+		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
 		ngrok.WithStopHandler(func(ctx context.Context, sess ngrok.Session) error {
 			go func() {
 				time.Sleep(time.Millisecond * 10)
 				ca()
-				// sess.Close()
 			}()
 			return nil
 		}),

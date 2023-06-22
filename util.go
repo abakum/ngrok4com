@@ -26,8 +26,6 @@ var (
 	ltf  = log.New(os.Stdout, " ", log.Ltime|log.Lshortfile)
 	let  = log.New(os.Stdout, BUG, log.Ltime)
 	lt   = log.New(os.Stdout, " ", log.Ltime)
-	//go:embed NGROK_API_KEY.txt
-	NGROK_API_KEY string
 )
 
 // Get source of code
@@ -69,9 +67,8 @@ func Getenv(key, val string) string {
 }
 
 func ngrokAPI() (publicURL string, forwardsTo string, err error) {
-	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY)
 	if NGROK_API_KEY == "" {
-		return "", "", Errorf("not NGROK_API_KEY in env")
+		return "", "", Errorf("empty NGROK_API_KEY")
 	}
 
 	// construct the api client
