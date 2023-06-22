@@ -17,6 +17,7 @@ import (
 	"go.bug.st/serial/enumerator"
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -153,9 +154,18 @@ func main() {
 
 // https://github.com/ngrok/ngrok-go/blob/main/examples/ngrok-lite/main.go
 func run(ctx context.Context, dest string) error {
+	ctx, ca := context.WithCancel(ctx)
 	tun, err := ngrok.Listen(ctx,
 		config.TCPEndpoint(),
 		ngrok.WithAuthtoken(Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN)),
+		ngrok.WithStopHandler(func(ctx context.Context, sess ngrok.Session) error {
+			go func() {
+				time.Sleep(time.Millisecond * 10)
+				ca()
+				// sess.Close()
+			}()
+			return nil
+		}),
 	)
 	if err != nil {
 		return srcError(err)
@@ -176,48 +186,50 @@ func run(ctx context.Context, dest string) error {
 	}
 }
 
-// func handleConn_(ctx context.Context, dest string, conn net.Conn) error {
-// 	next, err := net.Dial("tcp", dest)
-// 	if err != nil {
-// 		return srcError(err)
-// 	}
-// 	g, _ := errgroup.WithContext(ctx)
-
-// 	g.Go(func() error {
-// 		_, err := io.Copy(next, conn)
-// 		next.Close()
-// 		return srcError(err)
-// 	})
-// 	g.Go(func() error {
-// 		_, err := io.Copy(conn, next)
-// 		conn.Close()
-// 		return srcError(err)
-// 	})
-
-// 	return g.Wait()
-// }
-
 func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	defer conn.Close()
-	dial, err := net.Dial("tcp", dest)
+	next, err := net.Dial("tcp", dest)
 	if err != nil {
 		return srcError(err)
 	}
-	defer dial.Close()
+	defer next.Close()
 
-	done := make(chan error, 2)
+	g, _ := errgroup.WithContext(ctx)
 
-	go func() {
-		_, err = io.Copy(dial, conn)
-		// Signal peer that no more data is coming.
-		dial.(*net.TCPConn).CloseWrite()
-		// PrintOk("dial<conn", err)
-		done <- srcError(err)
-	}()
-	go func() {
-		_, err = io.Copy(conn, dial)
-		// PrintOk("conn<dial", err)
-		done <- srcError(err)
-	}()
-	return <-done
+	g.Go(func() error {
+		_, err := io.Copy(next, conn)
+		next.(*net.TCPConn).CloseWrite()
+		return srcError(err)
+	})
+	g.Go(func() error {
+		_, err := io.Copy(conn, next)
+		return srcError(err)
+	})
+
+	return g.Wait()
 }
+
+// func handleConn_(ctx context.Context, dest string, conn net.Conn) error {
+// 	defer conn.Close()
+// 	dial, err := net.Dial("tcp", dest)
+// 	if err != nil {
+// 		return srcError(err)
+// 	}
+// 	defer dial.Close()
+
+// 	done := make(chan error, 2)
+
+// 	go func() {
+// 		_, err = io.Copy(dial, conn)
+// 		// Signal peer that no more data is coming.
+// 		dial.(*net.TCPConn).CloseWrite()
+// 		// PrintOk("dial<conn", err)
+// 		done <- srcError(err)
+// 	}()
+// 	go func() {
+// 		_, err = io.Copy(conn, dial)
+// 		// PrintOk("conn<dial", err)
+// 		done <- srcError(err)
+// 	}()
+// 	return <-done
+// }
