@@ -17,7 +17,6 @@ import (
 	"go.bug.st/serial/enumerator"
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -40,7 +39,7 @@ func main() {
 			let.Println(err)
 			defer os.Exit(1)
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second)
 		fmt.Print("Press Enter>")
 		fmt.Scanln()
 	})
@@ -99,7 +98,6 @@ func main() {
 
 		"--create-filter=escparse,com,parse",
 		"--create-filter=purge,com,purge",
-		// "--create-filter=pin2con,com,connect:--connect=break", //
 		"--create-filter=pinmap,com,pinmap:--rts=cts --dtr=dsr --break=break",
 		"--create-filter=linectl,com,lc:--br=remote --lc=remote",
 		"--add-filters=0:com",
@@ -108,6 +106,7 @@ func main() {
 		"--create-filter=lsrmap,tcp,lsrmap",
 		"--create-filter=pinmap,tcp,pinmap:--cts=cts --dsr=dsr --dcd=dcd --ring=ring",
 		"--create-filter=linectl,tcp,lc:--br=local --lc=local",
+		"--create-filter=crypt,tcp,crypt:--secret="+NGROK_API_KEY,
 		"--add-filters=1:tcp",
 
 		"--octs=off",
@@ -119,7 +118,9 @@ func main() {
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
 	closer.Bind(func() {
-		PrintOk("hub4com", hub.Process.Kill())
+		if hub.Process != nil {
+			PrintOk("hub4com", hub.Process.Kill())
+		}
 	})
 	go func() {
 		err = hub.Run()
@@ -129,25 +130,24 @@ func main() {
 		}
 	}()
 	time.Sleep(time.Second)
-
-	ngr := exec.Command(
-		// "cmd",
-		// "/c",
-		// "start",
-		ngrokBin,
-		"tcp",
-		port,
-	)
-	ngr.Env = []string{"NGROK_AUTHTOKEN=" + NGROK_AUTHTOKEN}
-
-	err = srcError(ngr.Start())
-	if err != nil {
-		err = run(context.Background(), ":"+port)
-	} else {
+	if false {
+		// Allowed stoping from https://dashboard.ngrok.com/tunnels/agents
+		ngr := exec.Command(
+			// "cmd", "/c", "start", // show window of ngrok client for debug
+			ngrokBin,
+			"tcp",
+			port,
+		)
+		ngr.Env = []string{"NGROK_AUTHTOKEN=" + NGROK_AUTHTOKEN}
 		closer.Bind(func() {
-			PrintOk("ngrok", ngr.Process.Kill())
+			if ngr.Process != nil {
+				PrintOk("ngrok", ngr.Process.Kill())
+			}
 		})
-		closer.Hold()
+		err = srcError(ngr.Run())
+	} else {
+		ltf.Println(ngrokBin)
+		err = run(context.Background(), ":"+port)
 	}
 }
 
@@ -169,48 +169,55 @@ func run(ctx context.Context, dest string) error {
 			return srcError(err)
 		}
 
-		ltf.Println("accepted connection from", conn.RemoteAddr())
+		// ltf.Println("accepted connection from", conn.RemoteAddr())
 
-		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
+		// go PrintOk("connection closed:", handleConn(ctx, dest, conn))
+		go handleConn(ctx, dest, conn)
 	}
 }
 
-func handleConn_(ctx context.Context, dest string, conn net.Conn) error {
-	next, err := net.Dial("tcp", dest)
+// func handleConn_(ctx context.Context, dest string, conn net.Conn) error {
+// 	next, err := net.Dial("tcp", dest)
+// 	if err != nil {
+// 		return srcError(err)
+// 	}
+// 	g, _ := errgroup.WithContext(ctx)
+
+// 	g.Go(func() error {
+// 		_, err := io.Copy(next, conn)
+// 		next.Close()
+// 		return srcError(err)
+// 	})
+// 	g.Go(func() error {
+// 		_, err := io.Copy(conn, next)
+// 		conn.Close()
+// 		return srcError(err)
+// 	})
+
+// 	return g.Wait()
+// }
+
+func handleConn(ctx context.Context, dest string, conn net.Conn) error {
+	defer conn.Close()
+	dial, err := net.Dial("tcp", dest)
 	if err != nil {
 		return srcError(err)
 	}
+	defer dial.Close()
+
 	done := make(chan error, 2)
+
 	go func() {
-		_, err := io.Copy(next, conn)
-		next.Close()
+		_, err = io.Copy(dial, conn)
+		// Signal peer that no more data is coming.
+		dial.(*net.TCPConn).CloseWrite()
+		// PrintOk("dial<conn", err)
 		done <- srcError(err)
 	}()
 	go func() {
-		_, err := io.Copy(conn, next)
-		conn.Close()
+		_, err = io.Copy(conn, dial)
+		// PrintOk("conn<dial", err)
 		done <- srcError(err)
 	}()
 	return <-done
-}
-
-func handleConn(ctx context.Context, dest string, conn net.Conn) error {
-	next, err := net.Dial("tcp", dest)
-	if err != nil {
-		return srcError(err)
-	}
-	g, _ := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		_, err := io.Copy(next, conn)
-		next.Close()
-		return srcError(err)
-	})
-	g.Go(func() error {
-		_, err := io.Copy(conn, next)
-		conn.Close()
-		return srcError(err)
-	})
-
-	return g.Wait()
 }
