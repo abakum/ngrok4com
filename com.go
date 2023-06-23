@@ -24,7 +24,7 @@ func com() {
 		err      error
 		hub4com  = `..\hub4com\hub4com.exe`
 		ngrokBin = `..\ngrok\ngrok.exe`
-		serial   = "7"
+		serial   = ""
 	)
 	defer closer.Close()
 
@@ -63,19 +63,29 @@ func com() {
 		err = srcError(err)
 		return
 	}
+	i := 0
+	isDefault := false
+	ok := false
 	for _, sPort := range ports {
 		title := fmt.Sprintf("%s %s", sPort.Name, sPort.Product)
 		li.Println(title)
 		if !strings.Contains(sPort.Product, emulator) {
 			value := strings.TrimPrefix(sPort.Name, "COM")
-			isDefault := true //value != "1"
-			if len(os.Args) > 1 {
-				isDefault = value == serial
+			if serial == "" {
+				serial = value
+			} else {
+				isDefault = serial == value
+			}
+			ok = ok || isDefault
+			if i == 1 && !ok {
+				serial = value
+				isDefault = true
 			}
 			menu.Option(title, value, isDefault, nil)
+			i++
 		}
 	}
-	if len(os.Args) < 2 {
+	if !ok {
 		err = menu.Run()
 		if err != nil {
 			err = srcError(err)
@@ -157,8 +167,7 @@ func com() {
 		err = run(context.Background(), ":"+port)
 	}
 	if err != nil {
-		if //strings.Contains(err.Error(), "exit status 1") ||
-		strings.Contains(err.Error(), "ERR_NGROK_105") ||
+		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
 			planB(err)
 			err = nil
