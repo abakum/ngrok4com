@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -26,6 +26,7 @@ var (
 	ltf  = log.New(os.Stdout, " ", log.Ltime|log.Lshortfile)
 	let  = log.New(os.Stdout, BUG, log.Ltime)
 	lt   = log.New(os.Stdout, " ", log.Ltime)
+	li   = log.New(os.Stdout, "\t", 0)
 )
 
 // Get source of code
@@ -85,15 +86,16 @@ func ngrokAPI() (publicURL string, forwardsTo string, err error) {
 	ctx, ca := context.WithTimeout(context.Background(), time.Second*3)
 	defer ca()
 	for iter.Next(ctx) {
-		err = iter.Err()
-		if err != nil {
-			return "", "", srcError(err)
-		}
 		if true { //free version allow only one tunnel
 			return iter.Item().PublicURL, iter.Item().ForwardsTo, nil
 		}
 	}
-	return "", "", Errorf("not found online client")
+	err = iter.Err()
+	if err != nil {
+		return "", "", srcError(err)
+	} else {
+		return "", "", Errorf("not found online client")
+	}
 }
 
 func PrintOk(s string, err error) {
@@ -102,4 +104,16 @@ func PrintOk(s string, err error) {
 	} else {
 		lt.Println(src(8), s, "ok")
 	}
+}
+
+func logOff() {
+	for _, l := range []*log.Logger{letf, ltf, let, lt, li} {
+		l.SetOutput(io.Discard)
+	}
+}
+
+func pressEnter() {
+	logOff()
+	fmt.Print("Press Enter>")
+	fmt.Scanln()
 }
