@@ -16,8 +16,9 @@ var (
 	//go:embed NGROK_API_KEY.txt
 	NGROK_API_KEY string
 
-	crypt = "--data=8" //placeholder
-	port  = "7000"
+	crypt   = "--data=8" //placeholder
+	port    = "7000"
+	hub4com = `..\hub4com\hub4com.exe`
 )
 
 func main() {
@@ -31,11 +32,9 @@ func main() {
 	}
 	if len(os.Args) > 1 {
 		i, err := strconv.Atoi(os.Args[1])
-		if err == nil {
-			if i >= 9600 {
-				tty()
-				return
-			}
+		if err != nil || i >= 9600 {
+			tty()
+			return
 		}
 	}
 	com()

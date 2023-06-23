@@ -22,7 +22,6 @@ import (
 func com() {
 	var (
 		err      error
-		hub4com  = `..\hub4com\hub4com.exe`
 		ngrokBin = `..\ngrok\ngrok.exe`
 		serial   = ""
 	)
@@ -36,7 +35,8 @@ func com() {
 		pressEnter()
 	})
 
-	li.Println(os.Args[0], "serial port")
+	li.Println("serial server mode - режим сервера порта")
+	li.Println(os.Args[0], "[serial] [port]")
 	li.Println(os.Args)
 
 	if len(os.Args) > 1 {
@@ -45,12 +45,6 @@ func com() {
 
 	if len(os.Args) > 2 {
 		port = os.Args[2]
-	}
-
-	cwd, err := os.Getwd()
-	if err == nil {
-		hub4com = filepath.Join(cwd, hub4com)
-		ngrokBin = filepath.Join(cwd, ngrokBin)
 	}
 
 	menu := wmenu.NewMenu("Choose serial port")
@@ -68,8 +62,8 @@ func com() {
 	ok := false
 	for _, sPort := range ports {
 		title := fmt.Sprintf("%s %s", sPort.Name, sPort.Product)
-		li.Println(title)
 		if !strings.Contains(sPort.Product, emulator) {
+			li.Println(title)
 			value := strings.TrimPrefix(sPort.Name, "COM")
 			if serial == "" {
 				serial = value
@@ -85,16 +79,29 @@ func com() {
 			i++
 		}
 	}
-	if !ok {
-		err = menu.Run()
-		if err != nil {
-			err = srcError(err)
-			return
+	switch i {
+	case 0:
+		err = Errorf("no serial port")
+		return
+	case 1:
+	default:
+		if !ok {
+			err = menu.Run()
+			if err != nil {
+				err = srcError(err)
+				return
+			}
 		}
 	}
 
 	li.Println("serial", serial)
 	li.Println("port", port)
+
+	cwd, err := os.Getwd()
+	if err == nil {
+		hub4com = filepath.Join(cwd, hub4com)
+		ngrokBin = filepath.Join(cwd, ngrokBin)
+	}
 
 	hub := exec.Command(
 		hub4com,
@@ -134,7 +141,7 @@ func com() {
 			closer.Close()
 		}
 	}()
-	// time.Sleep(time.Second)
+	time.Sleep(time.Second)
 
 	if NGROK_AUTHTOKEN == "" {
 		planB(Errorf("empty NGROK_AUTHTOKEN"))
@@ -176,25 +183,31 @@ func com() {
 }
 
 func planB(err error) {
-	defer closer.Hold()
+	s := "Plan B: say IP for connect tty without internet"
+	i := 0
 	let.Println(err)
-	li.Println("Plan B: say IP for connect tty without internet")
 	ifaces, err := net.Interfaces()
-	if err != nil {
-		return
-	}
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			return
-		}
-		for _, addr := range addrs {
-			if strings.HasPrefix(addr.String(), "::") ||
-				strings.HasPrefix(addr.String(), "127.") {
+	if err == nil {
+		for _, ifac := range ifaces {
+			addrs, err := ifac.Addrs()
+			if err != nil {
 				continue
 			}
-			li.Println(addr)
+			for _, addr := range addrs {
+				if strings.HasPrefix(addr.String(), "::") ||
+					strings.HasPrefix(addr.String(), "127.") {
+					continue
+				}
+				s += "\n\t" + addr.String()
+				i++
+			}
 		}
+	}
+	if i > 0 {
+		li.Println(s)
+		closer.Hold()
+	} else {
+		letf.Println("no ifaces for server")
 	}
 }
 

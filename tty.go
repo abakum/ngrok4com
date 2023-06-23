@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dixonwille/wmenu/v5"
 	"github.com/xlab/closer"
@@ -15,10 +17,9 @@ import (
 func tty() {
 	var (
 		err       error
-		hub4com   = `..\hub4com\hub4com.exe`
 		kitty     = `..\kitty\kitty_portable.exe`
-		sercfg    = "9600"
-		host      = "10.161.115.189:" + port
+		baud      = "9600"
+		host      = ""
 		serial    = "11"
 		CNCB      = "10"
 		publicURL string
@@ -34,31 +35,37 @@ func tty() {
 		pressEnter()
 	})
 
+	li.Println("tty mode - режим терминала")
+	li.Println(os.Args[0], "[baud] [host]")
+	li.Println(os.Args)
+
 	if len(os.Args) > 1 {
-		sercfg = os.Args[1]
-	} else {
-		menu := wmenu.NewMenu("Choose baud")
-		menu.Action(func(opts []wmenu.Opt) error {
-			sercfg = opts[0].Text
-			return nil
-		})
-		menu.Option("9600", 1, sercfg == "9600", nil)
-		menu.Option("38400", 2, sercfg == "38400", nil)
-		menu.Option("57600", 3, sercfg == "57600", nil)
-		menu.Option("115200", 4, sercfg == "115200", nil)
-		err = menu.Run()
+		_, err = strconv.Atoi(os.Args[1])
 		if err != nil {
-			err = srcError(err)
-			return
+			host = os.Args[1]
+			menu := wmenu.NewMenu("Choose baud - Выбери скорость")
+			menu.Action(func(opts []wmenu.Opt) error {
+				baud = opts[0].Text
+				return nil
+			})
+			menu.Option("9600", 1, baud == "9600", nil)
+			menu.Option("38400", 2, baud == "38400", nil)
+			menu.Option("57600", 3, baud == "57600", nil)
+			menu.Option("115200", 4, baud == "115200", nil)
+			err = menu.Run()
+			if err != nil {
+				err = srcError(err)
+				return
+			}
+		} else {
+			baud = os.Args[1]
+			if len(os.Args) > 2 {
+				host = os.Args[2]
+			}
 		}
 	}
 
-	if len(os.Args) > 2 {
-		host = os.Args[2]
-		if !strings.Contains(host, ":") {
-			host += ":" + port
-		}
-	}
+	li.Println("baud", baud)
 
 	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil {
@@ -67,8 +74,8 @@ func tty() {
 	}
 	pair := ""
 	for _, sPort := range ports {
-		li.Println(sPort.Name, sPort.Product)
 		if strings.HasPrefix(sPort.Product, emulator) {
+			li.Println(sPort.Name, sPort.Product)
 			if pair == "" {
 				pair = string(sPort.Product[len(sPort.Product)-1])
 			}
@@ -88,14 +95,13 @@ func tty() {
 		return
 	}
 
-	li.Println(os.Args[0], "sercfg host")
-	li.Println(os.Args)
-	li.Println("sercfg", sercfg)
+	li.Println("serial", serial)
+	li.Println("CNCB", CNCB)
 
-	if len(os.Args) > 2 || NGROK_API_KEY == "" {
-		li.Println("local mode")
+	if host != "" || NGROK_API_KEY == "" {
+		li.Println("LAN mode - режим локальной сети")
 	} else {
-		li.Println("ngrok mode")
+		li.Println("ngrok mode - режим ngrok")
 		publicURL, _, err = ngrokAPI()
 		if err != nil {
 			return
@@ -109,9 +115,10 @@ func tty() {
 		host = tcp.Host
 	}
 
+	if !strings.Contains(host, ":") {
+		host += ":" + port
+	}
 	li.Println("host", host)
-	li.Println("serial", serial)
-	li.Println("CNCB", CNCB)
 
 	cwd, err := os.Getwd()
 	if err == nil {
@@ -154,11 +161,12 @@ func tty() {
 			closer.Close()
 		}
 	}()
+	time.Sleep(time.Second)
 
 	ki := exec.Command(
 		kitty,
 		"-sercfg",
-		sercfg,
+		baud,
 		"-serial",
 		"COM"+serial,
 	)
