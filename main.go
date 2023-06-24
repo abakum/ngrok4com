@@ -27,9 +27,6 @@ func main() {
 	// NGROK_AUTHTOKEN = ""                                   // emulate local mode
 	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY) //if emty then no crypt
 	// NGROK_API_KEY = ""                                     // emulate no crypt
-	if NGROK_API_KEY != "" {
-		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
-	}
 	if len(os.Args) > 1 {
 		i, err := strconv.Atoi(os.Args[1])
 		if err != nil || i >= 9600 {

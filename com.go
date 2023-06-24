@@ -36,7 +36,7 @@ func com() {
 	})
 
 	li.Println("serial server mode - режим сервера порта")
-	li.Println(os.Args[0], "[serial] [port]")
+	li.Println(os.Args[0], "serial [port]")
 	li.Println(os.Args)
 
 	if len(os.Args) > 1 {
@@ -47,7 +47,13 @@ func com() {
 		port = os.Args[2]
 	}
 
-	menu := wmenu.NewMenu("Choose serial port")
+	if strings.HasPrefix(port, "-") {
+		NGROK_AUTHTOKEN = "" // no ngrok
+		NGROK_API_KEY = ""   // no crypt
+		port = strings.TrimPrefix(port, "-")
+	}
+
+	menu := wmenu.NewMenu("Choose serial port- Выбери последовательный порт")
 	menu.Action(func(opts []wmenu.Opt) error {
 		serial = opts[0].Value.(string)
 		return nil
@@ -95,12 +101,17 @@ func com() {
 	}
 
 	li.Println("serial", serial)
+
 	li.Println("port", port)
 
 	cwd, err := os.Getwd()
 	if err == nil {
 		hub4com = filepath.Join(cwd, hub4com)
 		ngrokBin = filepath.Join(cwd, ngrokBin)
+	}
+
+	if NGROK_API_KEY != "" {
+		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
 	}
 
 	hub := exec.Command(
@@ -183,7 +194,7 @@ func com() {
 }
 
 func planB(err error) {
-	s := "Plan B: say IP for connect tty without internet"
+	s := "LAN mode - режим локальной сети"
 	i := 0
 	let.Println(err)
 	ifaces, err := net.Interfaces()
@@ -194,7 +205,7 @@ func planB(err error) {
 				continue
 			}
 			for _, addr := range addrs {
-				if strings.HasPrefix(addr.String(), "::") ||
+				if strings.Contains(addr.String(), ":") ||
 					strings.HasPrefix(addr.String(), "127.") {
 					continue
 				}

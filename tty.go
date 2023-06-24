@@ -99,6 +99,8 @@ func tty() {
 	li.Println("CNCB", CNCB)
 
 	if host != "" || NGROK_API_KEY == "" {
+		NGROK_AUTHTOKEN = "" // no ngrok
+		NGROK_API_KEY = ""   // no crypt
 		li.Println("LAN mode - режим локальной сети")
 	} else {
 		li.Println("ngrok mode - режим ngrok")
@@ -124,6 +126,10 @@ func tty() {
 	if err == nil {
 		hub4com = filepath.Join(cwd, hub4com)
 		kitty = filepath.Join(cwd, kitty)
+	}
+
+	if NGROK_API_KEY != "" {
+		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
 	}
 
 	hub := exec.Command(
