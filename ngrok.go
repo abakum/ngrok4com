@@ -6,11 +6,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/ngrok/ngrok-api-go/v5"
 	"github.com/ngrok/ngrok-api-go/v5/tunnels"
 )
+
+func Getenv(key, val string) string {
+	s := os.Getenv(key)
+	if s == "" {
+		return val
+	}
+	return s
+}
 
 func ngrokWeb() (publicURL string, forwardsTo string, err error) {
 	web_addr := Getenv("web_addr", "localhost:4040")

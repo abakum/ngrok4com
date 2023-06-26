@@ -54,14 +54,6 @@ func srcError(err error) error {
 	return fmt.Errorf(src(8)+" %w", err)
 }
 
-func Getenv(key, val string) string {
-	s := os.Getenv(key)
-	if s == "" {
-		return val
-	}
-	return s
-}
-
 func PrintOk(s string, err error) {
 	if err != nil {
 		let.Println(src(8), s, err)
