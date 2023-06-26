@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
@@ -42,7 +44,7 @@ func tty() {
 	if len(os.Args) > 1 {
 		_, err = strconv.Atoi(os.Args[1])
 		if err != nil {
-			host = os.Args[1]
+			host = abs(os.Args[1])
 			menu := wmenu.NewMenu("Choose baud - Выбери скорость")
 			menu.Action(func(opts []wmenu.Opt) error {
 				baud = opts[0].Text
@@ -58,9 +60,9 @@ func tty() {
 				return
 			}
 		} else {
-			baud = os.Args[1]
+			baud = abs(os.Args[1])
 			if len(os.Args) > 2 {
-				host = os.Args[2]
+				host = abs(os.Args[2])
 			}
 		}
 	}
@@ -149,7 +151,6 @@ func tty() {
 	if NGROK_API_KEY != "" {
 		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
 	}
-
 	hub := exec.Command(
 		hub4com,
 		"--baud=460800",
@@ -171,8 +172,10 @@ func tty() {
 		"--use-driver=tcp",
 		host,
 	)
-	hub.Stdout = os.Stdout
-	hub.Stderr = os.Stderr
+	// try run hub4com for test connection to host
+	var b bytes.Buffer
+	hub.Stdout = &b
+	hub.Stderr = &b
 	closer.Bind(func() {
 		if hub.Process != nil && hub.ProcessState == nil {
 			PrintOk("hub4com Kill", hub.Process.Kill())
@@ -185,7 +188,19 @@ func tty() {
 			closer.Close()
 		}
 	}()
-	time.Sleep(time.Second)
+	for i := 0; i < 12; i++ {
+		if strings.Contains(b.String(), "ERROR 10061") {
+			err = Errorf("no connection could be made because the %s actively refused it", host)
+			return
+		}
+		if strings.Contains(b.String(), "TCP(1): Connected") {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+	fmt.Print(b.String())
+	hub.Stdout = os.Stdout
+	hub.Stderr = os.Stderr
 
 	ki := exec.Command(
 		kitty,

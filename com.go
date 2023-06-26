@@ -40,24 +40,13 @@ func com() {
 	li.Println(os.Args)
 
 	if len(os.Args) > 1 {
-		serial = os.Args[1]
+		serial = abs(os.Args[1])
 	}
 
 	if len(os.Args) > 2 {
-		port = os.Args[2]
+		port = abs(os.Args[2])
 	}
 
-	if strings.HasPrefix(port, "-") {
-		NGROK_AUTHTOKEN = "" // no ngrok
-		NGROK_API_KEY = ""   // no crypt
-		port = strings.TrimPrefix(port, "-")
-	}
-
-	menu := wmenu.NewMenu("Choose serial port- Выбери последовательный порт")
-	menu.Action(func(opts []wmenu.Opt) error {
-		serial = opts[0].Value.(string)
-		return nil
-	})
 	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil {
 		err = srcError(err)
@@ -66,6 +55,7 @@ func com() {
 	i := 0
 	isDefault := false
 	ok := false
+	menu := wmenu.NewMenu("Choose serial port- Выбери последовательный порт")
 	for _, sPort := range ports {
 		title := fmt.Sprintf("%s %s", sPort.Name, sPort.Product)
 		if !strings.Contains(sPort.Product, emulator) {
@@ -92,6 +82,10 @@ func com() {
 	case 1:
 	default:
 		if !ok {
+			menu.Action(func(opts []wmenu.Opt) error {
+				serial = opts[0].Value.(string)
+				return nil
+			})
 			err = menu.Run()
 			if err != nil {
 				err = srcError(err)

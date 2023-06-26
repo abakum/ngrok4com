@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -35,4 +36,13 @@ func main() {
 		}
 	}
 	com()
+}
+
+func abs(s string) string {
+	if strings.HasPrefix(s, "-") {
+		NGROK_AUTHTOKEN = "" // no ngrok
+		NGROK_API_KEY = ""   // no crypt
+		return strings.TrimPrefix(s, "-")
+	}
+	return s
 }
