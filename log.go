@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -9,10 +8,6 @@ import (
 	"path"
 	"runtime/debug"
 	"strings"
-	"time"
-
-	"github.com/ngrok/ngrok-api-go/v5"
-	"github.com/ngrok/ngrok-api-go/v5/tunnels"
 )
 
 const (
@@ -65,37 +60,6 @@ func Getenv(key, val string) string {
 		return val
 	}
 	return s
-}
-
-func ngrokAPI() (publicURL string, forwardsTo string, err error) {
-	if NGROK_API_KEY == "" {
-		return "", "", Errorf("empty NGROK_API_KEY")
-	}
-
-	// construct the api client
-	clientConfig := ngrok.NewClientConfig(NGROK_API_KEY)
-
-	// list all online client
-	client := tunnels.NewClient(clientConfig)
-	iter := client.List(nil)
-	err = iter.Err()
-	if err != nil {
-		return "", "", srcError(err)
-	}
-
-	ctx, ca := context.WithTimeout(context.Background(), time.Second*3)
-	defer ca()
-	for iter.Next(ctx) {
-		if true { //free version allow only one tunnel
-			return iter.Item().PublicURL, iter.Item().ForwardsTo, nil
-		}
-	}
-	err = iter.Err()
-	if err != nil {
-		return "", "", srcError(err)
-	} else {
-		return "", "", Errorf("not found online client")
-	}
 }
 
 func PrintOk(s string, err error) {

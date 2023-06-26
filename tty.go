@@ -16,14 +16,14 @@ import (
 
 func tty() {
 	var (
-		err       error
-		kitty     = `..\kitty\kitty_portable.exe`
-		baud      = "9600"
-		host      = ""
-		serial    = "11"
-		CNCB      = "10"
+		err   error
+		kitty = `..\kitty\kitty_portable.exe`
+		baud  = "9600"
+		host,
+		serial,
+		CNCB,
 		publicURL string
-		tcp       *url.URL
+		tcp *url.URL
 	)
 	defer closer.Close()
 
@@ -74,28 +74,47 @@ func tty() {
 	}
 	pair := ""
 	for _, sPort := range ports {
+		// look only first pair
+		com := strings.TrimPrefix(sPort.Name, "COM")
 		if strings.HasPrefix(sPort.Product, emulator) {
 			li.Println(sPort.Name, sPort.Product)
-			if pair == "" {
-				pair = string(sPort.Product[len(sPort.Product)-1])
-			}
-			if !strings.HasSuffix(sPort.Product, pair) {
-				continue
-			}
-			XX := strings.TrimPrefix(sPort.Product, emulator+" CNC")
-			if strings.HasPrefix(XX, "B") {
-				CNCB = strings.TrimPrefix(sPort.Name, "COM")
+			if strings.HasPrefix(sPort.Product, emulator+" CNC") {
+				// Windows10
+				p := string(strings.TrimPrefix(sPort.Product, emulator+" CNC")[1])
+				if pair == "" {
+					pair = p
+				}
+				if pair != p {
+					continue
+				}
+				if strings.HasPrefix(sPort.Product, emulator+" CNCA") {
+					// setupc install PortName=sPort.Name -
+					serial = com
+					CNCB = "CNCB" + pair
+				} else {
+					// setupc install PortName=COMserial PortName=sPort.Name
+					CNCB = sPort.Name
+					break
+				}
 			} else {
-				serial = strings.TrimPrefix(sPort.Name, "COM")
+				// Windows7
+				if serial == "" {
+					serial = com
+					CNCB = "CNCB0"
+				} else {
+					CNCB = sPort.Name
+					break
+				}
 			}
 		}
 	}
-	if pair == "" {
+	if serial == "" {
 		err = Errorf("not found %s", emulator)
 		return
 	}
-
 	li.Println("serial", serial)
+
+	CNCB = `\\.\` + CNCB
 	li.Println("CNCB", CNCB)
 
 	if host != "" || NGROK_API_KEY == "" {
@@ -104,7 +123,7 @@ func tty() {
 		li.Println("LAN mode - режим локальной сети")
 	} else {
 		li.Println("ngrok mode - режим ngrok")
-		publicURL, _, err = ngrokAPI()
+		publicURL, _, err = ngrokAPI(NGROK_API_KEY)
 		if err != nil {
 			return
 		}
@@ -116,7 +135,6 @@ func tty() {
 		}
 		host = tcp.Host
 	}
-
 	if !strings.Contains(host, ":") {
 		host += ":" + port
 	}
@@ -148,7 +166,7 @@ func tty() {
 		"--add-filters=1:tcp",
 
 		"--octs=off",
-		`\\.\COM`+CNCB,
+		CNCB,
 
 		"--use-driver=tcp",
 		host,

@@ -23,7 +23,7 @@ func com() {
 	var (
 		err      error
 		ngrokBin = `..\ngrok\ngrok.exe`
-		serial   = ""
+		serial   string
 	)
 	defer closer.Close()
 
@@ -101,7 +101,6 @@ func com() {
 	}
 
 	li.Println("serial", serial)
-
 	li.Println("port", port)
 
 	cwd, err := os.Getwd()
@@ -159,7 +158,7 @@ func com() {
 		return
 	}
 
-	_, forwardsTo, err := ngrokAPI()
+	_, forwardsTo, err := ngrokAPI(NGROK_API_KEY)
 	if err == nil {
 		planB(Errorf("found online client: %s", forwardsTo))
 		return
@@ -168,7 +167,7 @@ func com() {
 
 	if false {
 		ngr := exec.Command(
-			// "cmd", "/c", "start", // show window of ngrok client for debug
+			"cmd", "/c", "start", // show window of ngrok client for debug
 			ngrokBin,
 			"tcp",
 			port,
