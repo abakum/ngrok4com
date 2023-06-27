@@ -172,10 +172,10 @@ func tty() {
 		"--use-driver=tcp",
 		host,
 	)
-	// try run hub4com for test connection to host
-	var b bytes.Buffer
-	hub.Stdout = &b
-	hub.Stderr = &b
+
+	var bBuffer bytes.Buffer
+	hub.Stdout = &bBuffer
+	hub.Stderr = &bBuffer
 	closer.Bind(func() {
 		if hub.Process != nil && hub.ProcessState == nil {
 			PrintOk("hub4com Kill", hub.Process.Kill())
@@ -188,17 +188,22 @@ func tty() {
 			closer.Close()
 		}
 	}()
-	for i := 0; i < 12; i++ {
-		if strings.Contains(b.String(), "ERROR 10061") {
-			err = Errorf("no connection could be made because the %s actively refused it", host)
-			return
+	for i := 0; i < 24; i++ {
+		s, er := bBuffer.ReadString('\n')
+		if er == nil {
+			if strings.Contains(s, "ERROR") {
+				err = Errorf(s)
+				return
+			}
+			fmt.Print(s)
+			if s == "TCP(1): Connected\n" {
+				break
+			}
 		}
-		if strings.Contains(b.String(), "TCP(1): Connected") {
-			break
-		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 50)
 	}
-	fmt.Print(b.String())
+	// fmt.Print(bBuffer.String())
+	bBuffer.WriteTo(os.Stdout)
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
 
