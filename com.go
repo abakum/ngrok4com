@@ -244,6 +244,15 @@ func run(ctx context.Context, dest string) error {
 			}()
 			return nil
 		}),
+		ngrok.WithDisconnectHandler(func(ctx context.Context, sess ngrok.Session, err error) {
+			PrintOk("WithDisconnectHandler", err)
+			if err == nil {
+				go func() {
+					time.Sleep(time.Millisecond * 10)
+					ca()
+				}()
+			}
+		}),
 	)
 	if err != nil {
 		return srcError(err)
