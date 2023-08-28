@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,28 +17,22 @@ import (
 
 func tty() {
 	var (
-		err   error
-		kitty = `..\kitty\kitty_portable.exe`
-		baud  = "9600"
-		host,
-		serial,
+		baud = "9600"
+		host = "127.0.0.1"
 		CNCB,
 		publicURL string
 		tcp *url.URL
 	)
-	defer closer.Close()
-
-	closer.Bind(func() {
-		if err != nil {
-			let.Println(err)
-			defer os.Exit(1)
-		}
-		pressEnter()
-	})
 
 	li.Println("tty mode - режим терминала")
-	li.Println(os.Args[0], "[baud] [host]")
+	li.Println(os.Args[0], "[-][baud] [host]")
 	li.Println(os.Args)
+
+	kitty, err = write(kitty)
+	if err != nil {
+		err = srcError(err)
+		return
+	}
 
 	if len(os.Args) > 1 {
 		_, err = strconv.Atoi(os.Args[1])
@@ -62,14 +55,14 @@ func tty() {
 		} else {
 			baud = abs(os.Args[1])
 			if len(os.Args) > 2 {
-				host = abs(os.Args[2])
+				host = os.Args[2]
 			}
 		}
 	}
 
 	li.Println("baud", baud)
 
-	ports, err := enumerator.GetDetailedPortsList()
+	ports, err = enumerator.GetDetailedPortsList()
 	if err != nil {
 		err = srcError(err)
 		return
@@ -78,18 +71,18 @@ func tty() {
 	for _, sPort := range ports {
 		// look only first pair
 		com := strings.TrimPrefix(sPort.Name, "COM")
-		if strings.HasPrefix(sPort.Product, emulator) {
+		if strings.HasPrefix(sPort.Product, EMULATOR) {
 			li.Println(sPort.Name, sPort.Product)
-			if strings.HasPrefix(sPort.Product, emulator+" CNC") {
+			if strings.HasPrefix(sPort.Product, EMULATOR+" CNC") {
 				// Windows10
-				p := string(strings.TrimPrefix(sPort.Product, emulator+" CNC")[1])
+				p := string(strings.TrimPrefix(sPort.Product, EMULATOR+" CNC")[1])
 				if pair == "" {
 					pair = p
 				}
 				if pair != p {
 					continue
 				}
-				if strings.HasPrefix(sPort.Product, emulator+" CNCA") {
+				if strings.HasPrefix(sPort.Product, EMULATOR+" CNCA") {
 					// setupc install PortName=sPort.Name -
 					serial = com
 					CNCB = "CNCB" + pair
@@ -111,7 +104,7 @@ func tty() {
 		}
 	}
 	if serial == "" {
-		err = Errorf("not found %s", emulator)
+		err = Errorf("not found %s\n`install 0 PortName=COM11,EmuBR=yes -`\n", EMULATOR)
 		return
 	}
 	li.Println("serial", serial)
@@ -142,19 +135,7 @@ func tty() {
 	}
 	li.Println("host", host)
 
-	cwd, err := os.Getwd()
-	if err == nil {
-		hub4com = filepath.Join(cwd, hub4com)
-		kitty = filepath.Join(cwd, kitty)
-	}
-
-	if NGROK_API_KEY != "" {
-		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
-	}
-	hub := exec.Command(
-		hub4com,
-		"--baud=460800",
-
+	opts = append(opts,
 		"--create-filter=escparse,com,parse",
 		"--create-filter=pinmap,com,pinmap:--rts=cts --dtr=dsr",
 		"--create-filter=linectl,com,lc:--br=local --lc=local",
@@ -163,7 +144,11 @@ func tty() {
 		"--create-filter=telnet,tcp,telnet:--comport=client",
 		"--create-filter=pinmap,tcp,pinmap:--rts=cts --dtr=dsr --break=break",
 		"--create-filter=linectl,tcp,lc:--br=remote --lc=remote",
-		crypt,
+	)
+	if crypt != "" {
+		opts = append(opts, crypt)
+	}
+	hub := exec.Command(hub4com, append(opts,
 		"--add-filters=1:tcp",
 
 		"--octs=off",
@@ -171,7 +156,7 @@ func tty() {
 
 		"--use-driver=tcp",
 		host,
-	)
+	)...)
 
 	var bBuffer bytes.Buffer
 	hub.Stdout = &bBuffer
@@ -182,7 +167,7 @@ func tty() {
 		}
 	})
 	go func() {
-		err := hub.Run()
+		err = hub.Run()
 		if err != nil {
 			PrintOk("hub4com Run", err)
 			closer.Close()

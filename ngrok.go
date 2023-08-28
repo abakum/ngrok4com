@@ -62,7 +62,8 @@ func ngrokWeb() (publicURL string, forwardsTo string, err error) {
 	return "", "", Errorf("not found online client")
 }
 
-func ngrokAPI(NGROK_API_KEY string) (string, string, error) {
+// get ngrok info of first tunnel
+func ngrokAPI(NGROK_API_KEY string) (publicURL, forwardsTo string, er error) {
 	if NGROK_API_KEY == "" {
 		return "", "", Errorf("empty NGROK_API_KEY")
 	}
