@@ -17,15 +17,14 @@ import (
 
 func tty() {
 	var (
-		baud = "9600"
-		host = "127.0.0.1"
-		CNCB,
-		publicURL string
+		baud,
+		host,
+		CNCB string
 		tcp *url.URL
 	)
 
 	li.Println("tty mode - режим терминала")
-	li.Println(os.Args[0], "[-][baud] [host]")
+	li.Println(os.Args[0], "{[-]baud [host]|[-]host}")
 	li.Println(os.Args)
 
 	kitty, err = write(kitty)
@@ -37,29 +36,34 @@ func tty() {
 	if len(os.Args) > 1 {
 		_, err = strconv.Atoi(os.Args[1])
 		if err != nil {
+			// ngrok4com [-]host
 			host = abs(os.Args[1])
-			menu := wmenu.NewMenu("Choose baud - Выбери скорость")
-			menu.Action(func(opts []wmenu.Opt) error {
-				baud = opts[0].Text
-				return nil
-			})
-			menu.Option("9600", 1, baud == "9600", nil)
-			menu.Option("38400", 2, baud == "38400", nil)
-			menu.Option("57600", 3, baud == "57600", nil)
-			menu.Option("115200", 4, baud == "115200", nil)
-			err = menu.Run()
-			if err != nil {
-				err = srcError(err)
-				return
-			}
 		} else {
+			// ngrok4com [-]baud
 			baud = abs(os.Args[1])
 			if len(os.Args) > 2 {
-				host = os.Args[2]
+				// ngrok4com [-]baud host
+				host = abs(os.Args[2])
 			}
 		}
 	}
-
+	if baud == "" {
+		baud = "9600"
+		menu := wmenu.NewMenu("Choose baud - Выбери скорость")
+		menu.Action(func(opts []wmenu.Opt) error {
+			baud = opts[0].Text
+			return nil
+		})
+		menu.Option("9600", 1, baud == "9600", nil)
+		menu.Option("38400", 2, baud == "38400", nil)
+		menu.Option("57600", 3, baud == "57600", nil)
+		menu.Option("115200", 4, baud == "115200", nil)
+		err = menu.Run()
+		if err != nil {
+			err = srcError(err)
+			return
+		}
+	}
 	li.Println("baud", baud)
 
 	ports, err = enumerator.GetDetailedPortsList()
@@ -104,7 +108,7 @@ func tty() {
 		}
 	}
 	if serial == "" {
-		err = Errorf("not found %s\n`install 0 PortName=COM11,EmuBR=yes -`\n", EMULATOR)
+		err = Errorf("not found %s\n`setupc 0 PortName=COM11,EmuBR=yes -`\n", EMULATOR)
 		return
 	}
 	li.Println("serial", serial)
@@ -112,17 +116,10 @@ func tty() {
 	CNCB = `\\.\` + CNCB
 	li.Println("CNCB", CNCB)
 
-	if host != "" || NGROK_API_KEY == "" {
-		NGROK_AUTHTOKEN = "" // no ngrok
-		NGROK_API_KEY = ""   // no crypt
+	if crypt == "" || errNgrok != nil || host != "" {
 		li.Println("LAN mode - режим локальной сети")
 	} else {
 		li.Println("ngrok mode - режим ngrok")
-		publicURL, _, err = ngrokAPI(NGROK_API_KEY)
-		if err != nil {
-			return
-		}
-
 		tcp, err = url.Parse(publicURL)
 		if err != nil {
 			err = srcError(err)
@@ -151,7 +148,12 @@ func tty() {
 	hub := exec.Command(hub4com, append(opts,
 		"--add-filters=1:tcp",
 
+		// "--use-driver=serial",
 		"--octs=off",
+		"--ito="+ITO,
+		"--ox="+XO,
+		"--ix="+XO,
+		"--write-limit="+LIMIT,
 		CNCB,
 
 		"--use-driver=tcp",
@@ -206,4 +208,5 @@ func tty() {
 	})
 
 	PrintOk("kitty Run", ki.Run())
+	// closer.Hold()
 }

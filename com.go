@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,15 +12,11 @@ import (
 	"github.com/dixonwille/wmenu/v5"
 	"github.com/xlab/closer"
 	"go.bug.st/serial/enumerator"
-	"golang.ngrok.com/ngrok"
-	"golang.ngrok.com/ngrok/config"
-	"golang.org/x/sync/errgroup"
 )
 
 func com() {
 	var (
-		forwardsTo string
-		ngrokBin   = `..\ngrok\ngrok.exe`
+		ngrokBin = `..\ngrok\ngrok.exe`
 	)
 
 	li.Println("serial server mode - режим сервера порта")
@@ -36,7 +30,7 @@ func com() {
 	}
 
 	if len(os.Args) > 2 {
-		port = abs(os.Args[2])
+		port = os.Args[2]
 	}
 
 	ports, err = enumerator.GetDetailedPortsList()
@@ -53,7 +47,7 @@ func com() {
 		if !strings.Contains(sPort.Product, EMULATOR) {
 			li.Println(title)
 			value := strings.TrimPrefix(sPort.Name, "COM")
-			if serial == "" {
+			if serial == "" || serial == "0" {
 				serial = value
 			} else {
 				isDefault = serial == value
@@ -108,7 +102,12 @@ func com() {
 	hub := exec.Command(hub4com, append(opts,
 		"--add-filters=1:tcp",
 
+		// "--use-driver=serial",
 		"--octs=off",
+		"--ito="+ITO,
+		"--ox="+XO,
+		"--ix="+XO,
+		"--write-limit="+LIMIT,
 		`\\.\COM`+serial,
 
 		"--use-driver=tcp",
@@ -131,13 +130,12 @@ func com() {
 	time.Sleep(time.Second)
 
 	if NGROK_AUTHTOKEN == "" {
-		planB(Errorf("empty NGROK_AUTHTOKEN"))
+		planB(Errorf("empty NGROK_AUTHTOKEN"), ":"+port)
 		return
 	}
 
-	_, forwardsTo, err = ngrokAPI(NGROK_API_KEY)
-	if err == nil {
-		planB(Errorf("found online client: %s", forwardsTo))
+	if errNgrok == nil {
+		planB(Errorf("found online client: %s", forwardsTo), ":"+port)
 		return
 	}
 	err = nil
@@ -158,123 +156,36 @@ func com() {
 		err = srcError(ngr.Run())
 	} else {
 		_ = ngrokBin
-		err = run(context.Background(), ":"+port)
+		err = run(context.Background(), ":"+port, false)
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
-			planB(err)
+			planB(err, ":"+port)
 			err = nil
 		}
 	}
 }
 
-func planB(er error) {
-	s := "LAN mode - режим локальной сети"
-	i := 0
-	let.Println(er)
-	ifaces, er := net.Interfaces()
-	if er == nil {
-		for _, ifac := range ifaces {
-			addrs, er := ifac.Addrs()
-			if er != nil {
-				continue
-			}
-			for _, addr := range addrs {
-				if strings.Contains(addr.String(), ":") ||
-					strings.HasPrefix(addr.String(), "127.") {
-					continue
-				}
-				s += "\n\t" + addr.String()
-				i++
-			}
-		}
-	}
-	if i > 0 {
-		li.Println(s)
-		closer.Hold()
-	} else {
-		letf.Println("no ifaces for server")
-	}
-}
-
-// https://github.com/ngrok/ngrok-go/blob/main/examples/ngrok-lite/main.go
-func run(ctx context.Context, dest string) error {
-	ctxWT, caWT := context.WithTimeout(ctx, time.Second)
-	defer caWT()
-	sess, er := ngrok.Connect(ctxWT,
-		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
-	)
-	if er != nil {
-		return Errorf("Connect %w", er)
-	}
-	sess.Close()
-
-	ctx, ca := context.WithCancel(ctx)
-	defer func() {
-		if er != nil {
-			ca()
-		}
-	}()
-
-	tun, er := ngrok.Listen(ctx,
-		config.TCPEndpoint(),
-		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
-		ngrok.WithStopHandler(func(ctx context.Context, sess ngrok.Session) error {
-			go func() {
-				time.Sleep(time.Millisecond * 10)
-				ca()
-			}()
-			return nil
-		}),
-		ngrok.WithDisconnectHandler(func(ctx context.Context, sess ngrok.Session, err error) {
-			PrintOk("WithDisconnectHandler", err)
-			if err == nil {
-				go func() {
-					time.Sleep(time.Millisecond * 10)
-					ca()
-				}()
-			}
-		}),
-	)
-	if er != nil {
-		return srcError(er)
-	}
-
-	ltf.Println("tunnel created:", tun.URL())
-
+func watch(dest string) {
+	withForwardsTo(dest)
 	for {
-		conn, er := tun.Accept()
-		if er != nil {
-			return srcError(er)
+		time.Sleep(TO)
+		if netstat("-a", dest, "") == "" {
+			li.Println("no listen ", dest)
+			break
 		}
-
-		// ltf.Println("accepted connection from", conn.RemoteAddr())
-
-		// go PrintOk("connection closed:", handleConn(ctx, dest, conn))
-		go handleConn(ctx, dest, conn)
 	}
 }
 
-func handleConn(ctx context.Context, dest string, conn net.Conn) error {
-	defer conn.Close()
-	next, er := net.Dial("tcp", dest)
-	if er != nil {
-		return srcError(er)
-	}
-	defer next.Close()
+func planB(err error, dest string) {
+	let.Println(err)
+	li.Println("LAN mode - режим локальной сети")
+	watch(dest)
+}
 
-	g, _ := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		_, er := io.Copy(next, conn)
-		next.(*net.TCPConn).CloseWrite()
-		return srcError(er)
-	})
-	g.Go(func() error {
-		_, er := io.Copy(conn, next)
-		return srcError(er)
-	})
-
-	return g.Wait()
+func withForwardsTo(lPort string) (meta string) {
+	meta = ifs + lPort
+	li.Println(meta)
+	return
 }
