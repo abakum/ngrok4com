@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -49,6 +50,10 @@ var (
 	ports []*enumerator.PortDetails
 	ips   []string
 	TO    = time.Second * 60
+	hub,
+	ki,
+	ngr *exec.Cmd
+	plus bool
 )
 
 func main() {
@@ -58,15 +63,19 @@ func main() {
 		if err != nil {
 			let.Println(err)
 			defer os.Exit(1)
+			pressEnter()
 		}
+		kill(ki)
+		kill(ngr)
+		kill(hub)
 		for _, v := range []string{
 			"Proxies",
 			"Sessions",
+			"Jumplist",
 			// "kitty.ini",
 		} {
 			os.RemoveAll(filepath.Join(cwd, BIN, v))
 		}
-		// pressEnter()
 	})
 
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
@@ -102,49 +111,47 @@ func main() {
 	ltf.Println(publicURL, forwardsTo, errNgrok)
 	if len(os.Args) > 1 {
 		i, er := strconv.Atoi(abs(os.Args[1]))
-		if er != nil || i >= 9600 {
+		if er != nil || i >= 75 {
 			// tty client mode
-			// ngrok mode with encryption:
-			// `ngrok4com baud` as `ngrok4com baud publicURL`
-			// LAN mode with encryption:
-			// `ngrok4com +` as `ngrok4com menuBaud 127.0.0.1`
-			// `ngrok4com host` as `ngrok4com menuBaud host`
-			// LAN mode without encryption:
-			// `ngrok4com -baud` as `ngrok4com baud 127.0.0.1`
-			// `ngrok4com -` as `ngrok4com menuBaud 127.0.0.1`
-			// `ngrok4com -host` as `ngrok4com menuBaud host`
+
+			// ngrok4com + `ngrok4com menuBaud 127.0.0.1` loop mode + encryption
+			// ngrok4com - `ngrok4com menuBaud 127.0.0.1` loop mode - encryption
+			// ngrok4com baud `ngrok4com baud publicURL` ngrok mode + encryption
+			// ngrok4com -baud `ngrok4com baud 127.0.0.1` loop mode - encryption
+			// ngrok4com baud host `ngrok4com baud host` LAN mode + encryption
+			// ngrok4com -baud host `ngrok4com baud host` LAN mode - encryption
+			// ngrok4com host `ngrok4com menuBaud host` LAN mode + encryption
+			// ngrok4com -host `ngrok4com menuBaud host` LAN mode - encryption
 			tty()
 			return
 		}
 		// serial server mode
-		// case port omit it is 7000
-		// ngrok mode with encryption:
-		// `ngrok4com 0` as `ngrok4com menuSerial 7000`
-		// `ngrok4com serial` as `ngrok4com serial 7000`
-		// LAN mode without encryption:
-		// `ngrok4com -0` as `ngrok4com menuSerial 7000`
-		// `ngrok4com -serial` as `ngrok4com serial 7000`
+		// ngrok4com 0 `ngrok4com menuSerial 7000` ngrok mode + encryption
+		// ngrok4com -0 `ngrok4com menuSerial 7000` LAN mode - encryption
+		// ngrok4com serial as `ngrok4com serial 7000` ngrok mode + encryption
+		// ngrok4com -serial as `ngrok4com serial 7000` LAN mode - encryption
 		com()
 	}
 
 	// ngrok4com
 	if errNgrok == nil {
-		// use ngrok as `ngrok4com menuBaud publicURL`
+		// used ngrok as `ngrok4com menuBaud publicURL`
 		tty()
 	} else {
-		// create ngrok with `ngrok4com menuSerial`
+		// created ngrok with `ngrok4com menuSerial`
 		com()
 	}
 }
 
 func abs(s string) string {
-	if strings.HasPrefix(s, "-") {
-		NGROK_AUTHTOKEN = "" // no ngrok
-		NGROK_API_KEY = ""   // no crypt
-		crypt = ""
-		return s[1:]
-	}
-	if strings.HasPrefix(s, "+") {
+	minus := strings.HasPrefix(s, "-")
+	plus = strings.HasPrefix(s, "+")
+	if minus || plus {
+		NGROK_AUTHTOKEN = ""
+		NGROK_API_KEY = ""
+		if minus {
+			crypt = ""
+		}
 		return s[1:]
 	}
 	return s
@@ -193,4 +200,10 @@ func interfaces() (ifs []string) {
 		}
 	}
 	return
+}
+
+func kill(c *exec.Cmd) {
+	if c != nil && c.Process != nil && c.ProcessState == nil {
+		PrintOk(cmd("Kill", c), c.Process.Kill())
+	}
 }

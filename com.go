@@ -115,15 +115,11 @@ func com() {
 	)...)
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
-	closer.Bind(func() {
-		if hub.Process != nil && hub.ProcessState == nil {
-			PrintOk("hub4com Kill", hub.Process.Kill())
-		}
-	})
 	go func() {
-		err = hub.Run()
+		li.Println(cmd("Run", hub))
+		err = srcError(hub.Run())
+		PrintOk(cmd("Close", hub), err)
 		if err != nil {
-			PrintOk("hub4com Run", err)
 			closer.Close()
 		}
 	}()
@@ -141,19 +137,16 @@ func com() {
 	err = nil
 
 	if false {
-		ngr := exec.Command(
+		ngr = exec.Command(
 			"cmd", "/c", "start", // show window of ngrok client for debug
 			ngrokBin,
 			"tcp",
 			port,
 		)
 		ngr.Env = []string{"NGROK_AUTHTOKEN=" + NGROK_AUTHTOKEN}
-		closer.Bind(func() {
-			if ngr.Process != nil && ngr.ProcessState == nil {
-				PrintOk("ngrok Kill", ngr.Process.Kill())
-			}
-		})
+		li.Println(cmd("Run", ngr))
 		err = srcError(ngr.Run())
+		PrintOk(cmd("Close", hub), err)
 	} else {
 		_ = ngrokBin
 		err = run(context.Background(), ":"+port, false)

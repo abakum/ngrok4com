@@ -36,35 +36,22 @@ func tty() {
 	if len(os.Args) > 1 {
 		_, err = strconv.Atoi(os.Args[1])
 		if err != nil {
-			// ngrok4com [-]host
+			// ngrok4com host
+			// ngrok4com -host
 			host = abs(os.Args[1])
 		} else {
-			// ngrok4com [-]baud
+			// ngrok4com -
+			// ngrok4com +
+			// ngrok4com baud
+			// ngrok4com -baud
 			baud = abs(os.Args[1])
 			if len(os.Args) > 2 {
-				// ngrok4com [-]baud host
+				// ngrok4com baud host
+				// ngrok4com -baud host
 				host = abs(os.Args[2])
 			}
 		}
 	}
-	if baud == "" {
-		baud = "9600"
-		menu := wmenu.NewMenu("Choose baud - Выбери скорость")
-		menu.Action(func(opts []wmenu.Opt) error {
-			baud = opts[0].Text
-			return nil
-		})
-		menu.Option("9600", 1, baud == "9600", nil)
-		menu.Option("38400", 2, baud == "38400", nil)
-		menu.Option("57600", 3, baud == "57600", nil)
-		menu.Option("115200", 4, baud == "115200", nil)
-		err = menu.Run()
-		if err != nil {
-			err = srcError(err)
-			return
-		}
-	}
-	li.Println("baud", baud)
 
 	ports, err = enumerator.GetDetailedPortsList()
 	if err != nil {
@@ -108,7 +95,7 @@ func tty() {
 		}
 	}
 	if serial == "" {
-		err = Errorf("not found %s\n`setupc 0 PortName=COM11,EmuBR=yes -`\n", EMULATOR)
+		err = Errorf("not found %s\n`setupc'\n`install 0 PortName=COM#,RealPortName=COM11,EmuBR=yes,AddRTTO=10,AddRITO=10 -`\n", EMULATOR)
 		return
 	}
 	li.Println("serial", serial)
@@ -116,7 +103,7 @@ func tty() {
 	CNCB = `\\.\` + CNCB
 	li.Println("CNCB", CNCB)
 
-	if crypt == "" || errNgrok != nil || host != "" {
+	if crypt == "" || errNgrok != nil || host != "" || plus {
 		li.Println("LAN mode - режим локальной сети")
 	} else {
 		li.Println("ngrok mode - режим ngrok")
@@ -145,7 +132,7 @@ func tty() {
 	if crypt != "" {
 		opts = append(opts, crypt)
 	}
-	hub := exec.Command(hub4com, append(opts,
+	hub = exec.Command(hub4com, append(opts,
 		"--add-filters=1:tcp",
 
 		// "--use-driver=serial",
@@ -163,15 +150,11 @@ func tty() {
 	var bBuffer bytes.Buffer
 	hub.Stdout = &bBuffer
 	hub.Stderr = &bBuffer
-	closer.Bind(func() {
-		if hub.Process != nil && hub.ProcessState == nil {
-			PrintOk("hub4com Kill", hub.Process.Kill())
-		}
-	})
 	go func() {
-		err = hub.Run()
+		li.Println(cmd("Run", hub))
+		err = srcError(hub.Run())
+		PrintOk(cmd("Close", hub), err)
 		if err != nil {
-			PrintOk("hub4com Run", err)
 			closer.Close()
 		}
 	}()
@@ -194,19 +177,38 @@ func tty() {
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
 
-	ki := exec.Command(
-		kitty,
-		"-sercfg",
-		baud,
-		"-serial",
-		"COM"+serial,
-	)
-	closer.Bind(func() {
-		if ki.Process != nil && ki.ProcessState == nil {
-			PrintOk("kitty Kill", ki.Process.Kill())
+	for {
+		if baud == "" {
+			baud = "9600"
+			menu := wmenu.NewMenu("Choose baud - Выбери скорость")
+			menu.Action(func(opts []wmenu.Opt) error {
+				baud = opts[0].Text
+				return nil
+			})
+			menu.Option("9600", 1, baud == "9600", nil)
+			menu.Option("38400", 2, baud == "38400", nil)
+			menu.Option("57600", 3, baud == "57600", nil)
+			menu.Option("115200", 4, baud == "115200", nil)
+			err = menu.Run()
+			if err != nil {
+				err = srcError(err)
+				return
+			}
 		}
-	})
+		// li.Println("baud", baud)
 
-	PrintOk("kitty Run", ki.Run())
+		ki = exec.Command(
+			kitty,
+			"-sercfg",
+			baud,
+			"-serial",
+			"COM"+serial,
+		)
+
+		li.Println(cmd("Run", ki))
+		err = srcError(ki.Run())
+		PrintOk(cmd("Close", ki), err)
+		baud = ""
+	}
 	// closer.Hold()
 }
