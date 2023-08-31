@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -11,8 +12,10 @@ import (
 	"time"
 
 	"github.com/dixonwille/wmenu/v5"
+	"github.com/f1bonacc1/glippy"
 	"github.com/xlab/closer"
 	"go.bug.st/serial/enumerator"
+	"gopkg.in/ini.v1"
 )
 
 func tty() {
@@ -33,6 +36,12 @@ func tty() {
 		return
 	}
 
+	_, err = write("Sessions", "Default%20Settings")
+	if err != nil {
+		err = srcError(err)
+		return
+	}
+
 	if len(os.Args) > 1 {
 		_, err = strconv.Atoi(os.Args[1])
 		if err != nil {
@@ -40,9 +49,9 @@ func tty() {
 			// ngrok4com -host
 			host = abs(os.Args[1])
 		} else {
-			// ngrok4com -
 			// ngrok4com +
 			// ngrok4com baud
+			// ngrok4com -
 			// ngrok4com -baud
 			baud = abs(os.Args[1])
 			if len(os.Args) > 2 {
@@ -103,17 +112,23 @@ func tty() {
 	CNCB = `\\.\` + CNCB
 	li.Println("CNCB", CNCB)
 
-	if crypt == "" || errNgrok != nil || host != "" || plus {
-		li.Println("LAN mode - режим локальной сети")
-	} else {
-		li.Println("ngrok mode - режим ngrok")
+	mode := "LAN mode - режим локальной сети"
+	if !(crypt == "" || errNgrok != nil || host != "") {
 		tcp, err = url.Parse(publicURL)
 		if err != nil {
 			err = srcError(err)
 			return
 		}
 		host = tcp.Host
+		connect, inLAN := fromNgrok(forwardsTo)
+		if inLAN == "" || plus {
+			mode = "ngrok mode - режим ngrok"
+		} else {
+			host = connect
+		}
 	}
+	li.Println(mode)
+
 	if !strings.Contains(host, ":") {
 		host += ":" + port
 	}
@@ -179,31 +194,46 @@ func tty() {
 
 	for {
 		if baud == "" {
-			baud = "9600"
-			menu := wmenu.NewMenu("Choose baud - Выбери скорость")
+			menu := wmenu.NewMenu("Choose baud or seconds delay for commands from clipboard\nВыбери скорость или задержку в секундах для команд из буфера обмена")
 			menu.Action(func(opts []wmenu.Opt) error {
-				baud = opts[0].Text
+				choose := strings.TrimSpace(opts[0].Text)
+				if strings.HasPrefix(choose, "0") {
+					commandDelay = choose
+					li.Println(commandDelay, "delay for commands from clipboard - задержка в секундах для команд из буфера обмена")
+				} else {
+					baud = choose
+				}
 				return nil
 			})
-			menu.Option("9600", 1, baud == "9600", nil)
-			menu.Option("38400", 2, baud == "38400", nil)
-			menu.Option("57600", 3, baud == "57600", nil)
-			menu.Option("115200", 4, baud == "115200", nil)
-			err = menu.Run()
-			if err != nil {
-				err = srcError(err)
-				return
+			commandDelay = ""
+			menu.Option("115200", 1, false, nil)
+			menu.Option("   0.2", 2, false, nil)
+			menu.Option(" 38400", 3, false, nil)
+			menu.Option("   0.4", 4, false, nil)
+			menu.Option(" 57600", 5, false, nil)
+			menu.Option("   0.6", 6, false, nil)
+			menu.Option("   0.7", 7, false, nil)
+			menu.Option("  0.08", 8, false, nil)
+			menu.Option("  9600", 9, true, nil)
+			for {
+				er := menu.Run()
+				if er != nil {
+					return
+				}
+				if baud != "" {
+					break
+				}
 			}
 		}
 		// li.Println("baud", baud)
-
-		ki = exec.Command(
-			kitty,
+		opts = []string{
 			"-sercfg",
 			baud,
 			"-serial",
-			"COM"+serial,
-		)
+			"COM" + serial,
+		}
+		PrintOk("cmdFromClipBoard", command())
+		ki = exec.Command(kitty, opts...)
 
 		li.Println(cmd("Run", ki))
 		err = srcError(ki.Run())
@@ -211,4 +241,90 @@ func tty() {
 		baud = ""
 	}
 	// closer.Hold()
+}
+
+func SetValue(section *ini.Section, key, val string) (set bool) {
+	set = section.Key(key).String() != val
+	if set {
+		ltf.Println(key, val)
+		section.Key(key).SetValue(val)
+	}
+	return
+}
+
+func command() error {
+	if !strings.Contains(commandDelay, ".") {
+		return fmt.Errorf("empty delay")
+	}
+	text, err := glippy.Get()
+	if err != nil {
+		return err
+	}
+	if text == "" {
+		return fmt.Errorf("empty ClipBoard")
+	}
+	temp, err := os.CreateTemp("", "cmdFromClipBoard")
+	if err != nil {
+		return err
+	}
+	clip := temp.Name()
+	defer os.Remove(clip)
+	n, err := temp.WriteString(text)
+	if err != nil {
+		return err
+	}
+	if n != len(text) {
+		return fmt.Errorf("error write ClipBoard to %s", clip)
+	}
+	ini.PrettyFormat = false
+	iniFile, err := ini.LoadSources(ini.LoadOptions{
+		IgnoreInlineComment: false,
+	}, kittyINI)
+	if err != nil {
+		return err
+	}
+	section := iniFile.Section("KiTTY")
+	ok := SetValue(section, "commanddelay", commandDelay)
+	if ok {
+		err = iniFile.SaveTo(kittyINI)
+		if err != nil {
+			return err
+		}
+	}
+	opts = append(opts,
+		"-cmd",
+		clip,
+	)
+	return nil
+}
+
+func contains(net, ip string) bool {
+	network, err := netip.ParsePrefix(net)
+	if err != nil {
+		return false
+	}
+	ipContains, err := netip.ParsePrefix(ip)
+	if err != nil {
+		return false
+	}
+	return network.Contains(ipContains.Addr())
+}
+
+func fromNgrok(forwardsTo string) (connect, inLAN string) {
+	netsPorts := strings.Split(forwardsTo, ":")
+	nets := strings.Split(netsPorts[0], ",")
+	for _, ip := range ips {
+		for _, net := range nets {
+			listen := strings.Split(net, "/")[0]
+			if !contains(net, ip) {
+				continue
+			}
+			inLAN = listen
+		}
+	}
+	if len(netsPorts) > 1 {
+		port = netsPorts[1]
+	}
+	connect = fmt.Sprintf("%s:%s", inLAN, port)
+	return
 }

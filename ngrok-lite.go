@@ -119,32 +119,25 @@ func run(ctx context.Context, dest string, http bool) error {
 	}
 
 	ltf.Println("tunnel created:", tun.URL())
-	// go func() {
-	// 	watch(dest)
-	// 	closer.Close()
-	// }()
 
 	for {
-		if netstat("-a", dest, "") == "" {
-			return srcError(fmt.Errorf("no listen %s", dest))
-		}
 		conn, err := tun.Accept()
 		if err != nil {
 			return srcError(err)
 		}
-
 		ltf.Println("accepted connection from", conn.RemoteAddr(), "to", conn.LocalAddr())
 
-		go PrintOk("connection closed", handleConn(ctx, dest, conn))
+		next, err := net.Dial("tcp", dest)
+		if err != nil {
+			return srcError(err)
+		}
+
+		PrintOk("connection closed", handleConn(ctx, next, conn))
 	}
 }
 
-func handleConn(ctx context.Context, dest string, conn net.Conn) error {
+func handleConn(ctx context.Context, next, conn net.Conn) error {
 	defer conn.Close()
-	next, err := net.Dial("tcp", dest)
-	if err != nil {
-		return srcError(err)
-	}
 	defer next.Close()
 
 	g, _ := errgroup.WithContext(ctx)

@@ -40,10 +40,12 @@ var (
 	serial,
 	ifs,
 	publicURL,
-	forwardsTo string
-	port    = "7000"
-	hub4com = `hub4com.exe`
-	kitty   = `kitty_portable.exe`
+	forwardsTo,
+	commandDelay string
+	port     = "7000"
+	hub4com  = `hub4com.exe`
+	kitty    = `kitty_portable.exe`
+	kittyINI = `kitty.ini`
 	err,
 	errNgrok error
 	opts  = []string{"--baud=" + BAUD}
@@ -60,22 +62,22 @@ func main() {
 	defer closer.Close()
 
 	closer.Bind(func() {
+		kill(ki)
+		kill(ngr)
+		kill(hub)
 		if err != nil {
 			let.Println(err)
 			defer os.Exit(1)
 			pressEnter()
 		}
-		kill(ki)
-		kill(ngr)
-		kill(hub)
-		for _, v := range []string{
-			"Proxies",
-			"Sessions",
-			"Jumplist",
-			// "kitty.ini",
-		} {
-			os.RemoveAll(filepath.Join(cwd, BIN, v))
-		}
+		// for _, v := range []string{
+		// 	"Proxies",
+		// 	"Sessions",
+		// 	"Jumplist",
+		// 	// "kitty.ini",
+		// } {
+		// 	os.RemoveAll(filepath.Join(cwd, BIN, v))
+		// }
 	})
 
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
@@ -106,6 +108,7 @@ func main() {
 		err = srcError(err)
 		return
 	}
+	kittyINI = filepath.Join(cwd, BIN, kittyINI)
 
 	publicURL, forwardsTo, errNgrok = ngrokAPI(NGROK_API_KEY)
 	ltf.Println(publicURL, forwardsTo, errNgrok)
@@ -114,9 +117,9 @@ func main() {
 		if er != nil || i >= 75 {
 			// tty client mode
 
-			// ngrok4com + `ngrok4com menuBaud 127.0.0.1` loop mode + encryption
-			// ngrok4com - `ngrok4com menuBaud 127.0.0.1` loop mode - encryption
+			// ngrok4com + `ngrok4com menuBaud publicURL` ngrok mode + encryption
 			// ngrok4com baud `ngrok4com baud publicURL` ngrok mode + encryption
+			// ngrok4com - `ngrok4com menuBaud 127.0.0.1` loop mode - encryption
 			// ngrok4com -baud `ngrok4com baud 127.0.0.1` loop mode - encryption
 			// ngrok4com baud host `ngrok4com baud host` LAN mode + encryption
 			// ngrok4com -baud host `ngrok4com baud host` LAN mode - encryption
@@ -126,10 +129,11 @@ func main() {
 			return
 		}
 		// serial server mode
+
 		// ngrok4com 0 `ngrok4com menuSerial 7000` ngrok mode + encryption
+		// ngrok4com serial `ngrok4com serial 7000` ngrok mode + encryption
 		// ngrok4com -0 `ngrok4com menuSerial 7000` LAN mode - encryption
-		// ngrok4com serial as `ngrok4com serial 7000` ngrok mode + encryption
-		// ngrok4com -serial as `ngrok4com serial 7000` LAN mode - encryption
+		// ngrok4com -serial `ngrok4com serial 7000` LAN mode - encryption
 		com()
 	}
 
@@ -147,8 +151,10 @@ func abs(s string) string {
 	minus := strings.HasPrefix(s, "-")
 	plus = strings.HasPrefix(s, "+")
 	if minus || plus {
-		NGROK_AUTHTOKEN = ""
-		NGROK_API_KEY = ""
+		if !plus {
+			NGROK_AUTHTOKEN = ""
+			NGROK_API_KEY = ""
+		}
 		if minus {
 			crypt = ""
 		}
@@ -157,14 +163,14 @@ func abs(s string) string {
 	return s
 }
 
-func write(fn string) (binFN string, err error) {
-	binFN = path.Join(BIN, fn)
-	bytes, err := bin.ReadFile(binFN)
+func write(fn ...string) (binFN string, err error) {
+	paths := append([]string{cwd, BIN}, fn...)
+	bytes, err := bin.ReadFile(path.Join(paths[1:]...))
 	if err != nil {
 		err = srcError(err)
 		return
 	}
-	binDir := filepath.Join(cwd, BIN)
+	binDir := filepath.Join(paths[:len(paths)-1]...)
 	_, err = os.Stat(binDir)
 	if err != nil {
 		err = os.MkdirAll(binDir, 0666)
@@ -173,12 +179,16 @@ func write(fn string) (binFN string, err error) {
 			return
 		}
 	}
-	binFN = filepath.Join(binDir, fn)
-	_, err = os.Stat(binFN)
+	binFN = filepath.Join(paths...)
+	fi, err := os.Stat(binFN)
+	var size int64
 	if err == nil {
-		return
+		size = fi.Size()
+		if int64(len(bytes)) == size {
+			return
+		}
 	}
-	ltf.Println(binFN, len(bytes))
+	ltf.Println(binFN, len(bytes), "->", size)
 	err = os.WriteFile(binFN, bytes, 0666)
 	return
 }
