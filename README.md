@@ -11,14 +11,16 @@ hub4com GUI and KiTTY helper for configuring remote devices via ngrok by serial 
 ## Usage:
 
 - git clone https://github.com/abakum/ngrok4com
-- place NGROK_AUTHTOKEN.txt to ngrok4com\ before build or set env during run
-- place NGROK_API_KEY.txt to ngrok4com\ before build or set env during run
-- on remote PC with COM3
-  - place hub4com\hub4com.exe to ..\ngrok4com.exe 
-  - run `ngrok4com 3`
-- on local PC with KiTTY
+- place NGROK_AUTHTOKEN.txt to ngrok4com\ before build for embed or set env during run
+- place NGROK_API_KEY.txt to ngrok4com\ before build for embed or set env during run
+- place hub4com.exe to ngrok4com\bin\ngrok4com.exe before build for embed
+- place kitty_portable.exe to ngrok4com\bin\kitty_portable.exe before build for embed
+- on remote PC with COM7
+  - run `ngrok4com 7`
+- on local PC
   - install [com0com](https://sourceforge.net/projects/com0com/files/com0com/3.0.0.0)
-  - setup COM11 for KiTTY by `run com0com\setupc.exe install PortName=COM11,EmuBR=yes -`
-  - place hub4com\hub4com.exe to ..\ngrok4com.exe
-  - place kitty\kitty_portable.exe to ..\ngrok4com.exe
-  - run `ngrok4com 9600` for control remote device over COM3 of remote PC
+  - setup COM11 for KiTTY by running<br>
+ `com0com\setupc.exe install 0 PortName=COM#,RealPortName=COM11,EmuBR=yes,AddRTTO=1,AddRITO=1 -`
+  - run `ngrok4com` for control remote device over COM7 of remote PC
+
+[Look more](RFC2217.md)
