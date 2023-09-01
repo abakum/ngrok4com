@@ -13,8 +13,8 @@ hub4com GUI and KiTTY helper for configuring remote devices via ngrok by serial 
 - git clone https://github.com/abakum/ngrok4com
 - place NGROK_AUTHTOKEN.txt to ngrok4com\ before build for embed or set env during run
 - place NGROK_API_KEY.txt to ngrok4com\ before build for embed or set env during run
-- place hub4com.exe to ngrok4com\bin\ngrok4com.exe before build for embed
-- place kitty_portable.exe to ngrok4com\bin\kitty_portable.exe before build for embed
+- place hub4com.exe to ngrok4com\bin\ before build for embed
+- place kitty_portable.exe to ngrok4com\bin\ before build for embed
 - on remote PC with COM7
   - run `ngrok4com 7`
 - on local PC
