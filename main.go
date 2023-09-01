@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ const (
 	LIMIT = "1"
 	ITO   = "10"
 	XO    = "on"
+	DELAY = "0.05"
 )
 
 var (
@@ -40,12 +42,12 @@ var (
 	serial,
 	ifs,
 	publicURL,
-	forwardsTo,
-	commandDelay string
-	port     = "7000"
-	hub4com  = `hub4com.exe`
-	kitty    = `kitty_portable.exe`
-	kittyINI = `kitty.ini`
+	forwardsTo string
+	commandDelay = DELAY
+	port         = "7000"
+	hub4com      = `hub4com.exe`
+	kitty        = `kitty_portable.exe`
+	kittyINI     = `kitty.ini`
 	err,
 	errNgrok error
 	opts  = []string{"--baud=" + BAUD}
@@ -90,25 +92,59 @@ func main() {
 		crypt = "--create-filter=crypt,tcp,crypt:--secret=" + NGROK_API_KEY
 	}
 
-	ips = interfaces()
-	if len(ips) == 0 {
-		err = srcError(fmt.Errorf("not connected - нет сети"))
-		return
-	}
-	ifs = strings.Join(ips, ",")
-
 	cwd, err = os.Getwd()
 	if err != nil {
 		err = srcError(err)
 		return
 	}
 
-	hub4com, err = write(hub4com)
+	err = fs.WalkDir(fs.FS(bin), BIN, func(unix string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		win := filepath.Join(append([]string{cwd}, strings.Split(unix, "/")...)...)
+		if d.IsDir() {
+			_, err = os.Stat(win)
+			if err != nil {
+				err = os.MkdirAll(win, 0666)
+			}
+			return err
+		}
+		bytes, err := bin.ReadFile(unix)
+		if err != nil {
+			return err
+		}
+		update := true
+		switch path.Base(unix) {
+		case hub4com:
+			hub4com = win
+		case kitty:
+			kitty = win
+		case kittyINI:
+			kittyINI = win
+			update = false
+		}
+		var size int64
+		fi, err := os.Stat(win)
+		if err == nil {
+			size = fi.Size()
+			if int64(len(bytes)) == size || !update {
+				return nil
+			}
+		}
+		ltf.Println(win, len(bytes), "->", size)
+		return os.WriteFile(win, bytes, 0666)
+	})
 	if err != nil {
-		err = srcError(err)
 		return
 	}
-	kittyINI = filepath.Join(cwd, BIN, kittyINI)
+
+	ips = interfaces()
+	if len(ips) == 0 {
+		err = srcError(fmt.Errorf("not connected - нет сети"))
+		return
+	}
+	ifs = strings.Join(ips, ",")
 
 	publicURL, forwardsTo, errNgrok = ngrokAPI(NGROK_API_KEY)
 	ltf.Println(publicURL, forwardsTo, errNgrok)
@@ -161,36 +197,6 @@ func abs(s string) string {
 		return s[1:]
 	}
 	return s
-}
-
-func write(fn ...string) (binFN string, err error) {
-	paths := append([]string{cwd, BIN}, fn...)
-	bytes, err := bin.ReadFile(path.Join(paths[1:]...))
-	if err != nil {
-		err = srcError(err)
-		return
-	}
-	binDir := filepath.Join(paths[:len(paths)-1]...)
-	_, err = os.Stat(binDir)
-	if err != nil {
-		err = os.MkdirAll(binDir, 0666)
-		if err != nil {
-			err = srcError(err)
-			return
-		}
-	}
-	binFN = filepath.Join(paths...)
-	fi, err := os.Stat(binFN)
-	var size int64
-	if err == nil {
-		size = fi.Size()
-		if int64(len(bytes)) == size {
-			return
-		}
-	}
-	ltf.Println(binFN, len(bytes), "->", size)
-	err = os.WriteFile(binFN, bytes, 0666)
-	return
 }
 
 func interfaces() (ifs []string) {

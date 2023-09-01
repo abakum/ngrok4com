@@ -30,18 +30,6 @@ func tty() {
 	li.Println(os.Args[0], "{[-]baud [host]|[-]host}")
 	li.Println(os.Args)
 
-	kitty, err = write(kitty)
-	if err != nil {
-		err = srcError(err)
-		return
-	}
-
-	_, err = write("Sessions", "Default%20Settings")
-	if err != nil {
-		err = srcError(err)
-		return
-	}
-
 	if len(os.Args) > 1 {
 		_, err = strconv.Atoi(os.Args[1])
 		if err != nil {
@@ -193,52 +181,51 @@ func tty() {
 	hub.Stderr = os.Stderr
 
 	for {
-		if baud == "" {
-			menu := wmenu.NewMenu("Choose baud or seconds delay for commands from clipboard\nВыбери скорость или задержку в секундах для команд из буфера обмена")
-			menu.Action(func(opts []wmenu.Opt) error {
-				choose := strings.TrimSpace(opts[0].Text)
-				if strings.HasPrefix(choose, "0") {
-					commandDelay = choose
-					li.Println(commandDelay, "delay for commands from clipboard - задержка в секундах для команд из буфера обмена")
+		if baud != "" {
+			opts = []string{
+				"-sercfg",
+				baud,
+				"-serial",
+				"COM" + serial,
+			}
+			PrintOk("cmdFromClipBoard", command())
+			ki = exec.Command(kitty, opts...)
+
+			li.Println(cmd("Run", ki))
+			err = srcError(ki.Run())
+			PrintOk(cmd("Close", ki), err)
+		}
+		menu := wmenu.NewMenu("Choose baud and seconds delay for Ctrl-F2 or commands from clipboard case delay>" + DELAY +
+			"\nВыбери скорость и задержку в секундах для Ctrl-F2 или команд из буфера обмена если задержка>" + DELAY)
+		menu.Action(func(opts []wmenu.Opt) error {
+			for _, v := range opts {
+				if strings.HasPrefix(v.Text, "0") {
+					commandDelay = v.Text
 				} else {
-					baud = choose
-				}
-				return nil
-			})
-			commandDelay = ""
-			menu.Option("115200", 1, false, nil)
-			menu.Option("   0.2", 2, false, nil)
-			menu.Option(" 38400", 3, false, nil)
-			menu.Option("   0.4", 4, false, nil)
-			menu.Option(" 57600", 5, false, nil)
-			menu.Option("   0.6", 6, false, nil)
-			menu.Option("   0.7", 7, false, nil)
-			menu.Option("  0.08", 8, false, nil)
-			menu.Option("  9600", 9, true, nil)
-			for {
-				er := menu.Run()
-				if er != nil {
-					return
-				}
-				if baud != "" {
-					break
+					baud = v.Text
 				}
 			}
+			li.Println("baud", baud)
+			li.Println("commandDelay", commandDelay)
+			return nil
+		})
+		menu.InitialIndex(0)
+		menu.Option(DELAY, 0, commandDelay == DELAY, nil)
+		menu.Option("115200", 1, baud == "115200", nil)
+		menu.Option("0.2", 2, commandDelay == "0.2", nil)
+		menu.Option("38400", 3, baud == "38400", nil)
+		menu.Option("0.4", 4, commandDelay == "0.4", nil)
+		menu.Option("57600", 5, baud == "57600", nil)
+		menu.Option("0.6", 6, commandDelay == "0.6", nil)
+		menu.Option("0.7", 7, commandDelay == "0.7", nil)
+		menu.Option("0.08", 8, commandDelay == "0.08", nil)
+		menu.Option("9600", 9, baud == "9600" || baud == "", nil)
+		if !strings.Contains(",115200,38400,57600,9600,,", ","+baud+",") {
+			menu.Option(baud, 10, true, nil)
 		}
-		// li.Println("baud", baud)
-		opts = []string{
-			"-sercfg",
-			baud,
-			"-serial",
-			"COM" + serial,
+		if menu.Run() != nil {
+			return
 		}
-		PrintOk("cmdFromClipBoard", command())
-		ki = exec.Command(kitty, opts...)
-
-		li.Println(cmd("Run", ki))
-		err = srcError(ki.Run())
-		PrintOk(cmd("Close", ki), err)
-		baud = ""
 	}
 	// closer.Hold()
 }
@@ -253,8 +240,23 @@ func SetValue(section *ini.Section, key, val string) (set bool) {
 }
 
 func command() error {
-	if !strings.Contains(commandDelay, ".") {
-		return fmt.Errorf("empty delay")
+	ini.PrettyFormat = false
+	iniFile, err := ini.LoadSources(ini.LoadOptions{
+		IgnoreInlineComment: false,
+	}, kittyINI)
+	if err != nil {
+		return err
+	}
+	section := iniFile.Section("KiTTY")
+	ok := SetValue(section, "commanddelay", commandDelay)
+	if ok {
+		err = iniFile.SaveTo(kittyINI)
+		if err != nil {
+			return err
+		}
+	}
+	if commandDelay == DELAY {
+		return nil
 	}
 	text, err := glippy.Get()
 	if err != nil {
@@ -275,21 +277,6 @@ func command() error {
 	}
 	if n != len(text) {
 		return fmt.Errorf("error write ClipBoard to %s", clip)
-	}
-	ini.PrettyFormat = false
-	iniFile, err := ini.LoadSources(ini.LoadOptions{
-		IgnoreInlineComment: false,
-	}, kittyINI)
-	if err != nil {
-		return err
-	}
-	section := iniFile.Section("KiTTY")
-	ok := SetValue(section, "commanddelay", commandDelay)
-	if ok {
-		err = iniFile.SaveTo(kittyINI)
-		if err != nil {
-			return err
-		}
 	}
 	opts = append(opts,
 		"-cmd",
