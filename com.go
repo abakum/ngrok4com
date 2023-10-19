@@ -40,7 +40,6 @@ func com() {
 	}
 	i := 0
 	isDefault := false
-	ok := false
 	menu := wmenu.NewMenu("Choose serial port- Выбери последовательный порт")
 	for _, sPort := range ports {
 		title := fmt.Sprintf("%s %s", sPort.Name, sPort.Product)

@@ -92,7 +92,7 @@ func tty() {
 		}
 	}
 	if serial == "" {
-		err = Errorf("not found %s\n`setupc'\n`install 0 PortName=COM#,RealPortName=COM11,EmuBR=yes,AddRTTO=10,AddRITO=10 -`\n", EMULATOR)
+		err = Errorf("not found %s\n`setupc install 0 PortName=COM#,RealPortName=COM11,EmuBR=yes,AddRTTO=1,AddRITO=1 -`\n", EMULATOR)
 		return
 	}
 	li.Println("serial", serial)
@@ -118,6 +118,7 @@ func tty() {
 	li.Println(mode)
 
 	if !strings.Contains(host, ":") {
+		// loop mode
 		host += ":" + port
 	}
 	li.Println("host", host)
@@ -210,24 +211,44 @@ func tty() {
 			return nil
 		})
 		menu.InitialIndex(0)
-		menu.Option(DELAY, 0, commandDelay == DELAY, nil)
-		menu.Option("115200", 1, baud == "115200", nil)
-		menu.Option("0.2", 2, commandDelay == "0.2", nil)
-		menu.Option("38400", 3, baud == "38400", nil)
-		menu.Option("0.4", 4, commandDelay == "0.4", nil)
-		menu.Option("57600", 5, baud == "57600", nil)
-		menu.Option("0.6", 6, commandDelay == "0.6", nil)
-		menu.Option("0.7", 7, commandDelay == "0.7", nil)
-		menu.Option("0.08", 8, commandDelay == "0.08", nil)
-		menu.Option("9600", 9, baud == "9600" || baud == "", nil)
-		if !strings.Contains(",115200,38400,57600,9600,,", ","+baud+",") {
-			menu.Option(baud, 10, true, nil)
+		ok = false
+		menu.Option(tit(DELAY, commandDelay, false))
+		menu.Option(tit("115200", baud, false))
+		menu.Option(tit("0.2", commandDelay, false))
+		menu.Option(tit("38400", baud, false))
+		menu.Option(tit("0.4", commandDelay, false))
+		menu.Option(tit("57600", baud, false))
+		menu.Option(tit("0.6", commandDelay, false))
+		menu.Option(tit("0.7", commandDelay, false))
+		menu.Option(tit("0.08", commandDelay, false))
+		menu.Option(tit("9600", baud, baud == ""))
+
+		// menu.Option(DELAY, 0, commandDelay == DELAY, nil)
+		// menu.Option("115200", 1, baud == "115200", nil)
+		// menu.Option("0.2", 2, commandDelay == "0.2", nil)
+		// menu.Option("38400", 3, baud == "38400", nil)
+		// menu.Option("0.4", 4, commandDelay == "0.4", nil)
+		// menu.Option("57600", 5, baud == "57600", nil)
+		// menu.Option("0.6", 6, commandDelay == "0.6", nil)
+		// menu.Option("0.7", 7, commandDelay == "0.7", nil)
+		// menu.Option("0.08", 8, commandDelay == "0.08", nil)
+		// menu.Option("9600", 9, baud == "9600" || baud == "", nil)
+		// if !strings.Contains(",115200,38400,57600,9600,,", ","+baud+",") {
+		if !ok {
+			// menu.Option(baud, 10, true, nil)
+			menu.Option(tit(baud, baud, false))
 		}
 		if menu.Run() != nil {
 			return
 		}
 	}
 	// closer.Hold()
+}
+
+func tit(t, def string, or bool) (title string, value interface{}, isDefault bool, function func(wmenu.Opt) error) {
+	isDefault = t == def || or
+	ok = ok || isDefault
+	return t, 0, isDefault, nil
 }
 
 func SetValue(section *ini.Section, key, val string) (set bool) {

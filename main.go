@@ -1,3 +1,7 @@
+// go install github.com/tc-hib/go-winres@latest
+// go-winres init
+// git tag v0.1.1-lw
+// git push origin --tags
 package main
 
 import (
@@ -57,7 +61,8 @@ var (
 	hub,
 	ki,
 	ngr *exec.Cmd
-	plus bool
+	plus,
+	ok bool
 )
 
 func main() {
@@ -153,23 +158,23 @@ func main() {
 		if er != nil || i >= 75 {
 			// tty client mode
 
-			// ngrok4com + `ngrok4com menuBaud publicURL` ngrok mode + encryption
-			// ngrok4com baud `ngrok4com baud publicURL` ngrok mode + encryption
-			// ngrok4com - `ngrok4com menuBaud 127.0.0.1` loop mode - encryption
-			// ngrok4com -baud `ngrok4com baud 127.0.0.1` loop mode - encryption
-			// ngrok4com baud host `ngrok4com baud host` LAN mode + encryption
-			// ngrok4com -baud host `ngrok4com baud host` LAN mode - encryption
-			// ngrok4com host `ngrok4com menuBaud host` LAN mode + encryption
-			// ngrok4com -host `ngrok4com menuBaud host` LAN mode - encryption
+			// `ngrok4com +` as `ngrok4com menuBaud publicURL` ngrok mode + encryption
+			// `ngrok4com baud` as `ngrok4com baud publicURL` ngrok mode + encryption
+			// `ngrok4com -` as `ngrok4com menuBaud 127.0.0.1` loop mode - encryption
+			// `ngrok4com -baud` as `ngrok4com baud 127.0.0.1` loop mode - encryption
+			// `ngrok4com baud host` as `ngrok4com baud host` LAN mode + encryption
+			// `ngrok4com -baud host` as `ngrok4com baud host` LAN mode - encryption
+			// `ngrok4com host` as `ngrok4com menuBaud host` LAN mode + encryption
+			// `ngrok4com -host` as `ngrok4com menuBaud host` LAN mode - encryption
 			tty()
 			return
 		}
 		// serial server mode
 
-		// ngrok4com 0 `ngrok4com menuSerial 7000` ngrok mode + encryption
-		// ngrok4com serial `ngrok4com serial 7000` ngrok mode + encryption
-		// ngrok4com -0 `ngrok4com menuSerial 7000` LAN mode - encryption
-		// ngrok4com -serial `ngrok4com serial 7000` LAN mode - encryption
+		// `ngrok4com 0` as `ngrok4com menuSerial 7000` ngrok mode + encryption
+		// `ngrok4com serial` as `ngrok4com serial 7000` ngrok mode + encryption
+		// `ngrok4com -0` as `ngrok4com menuSerial 7000` LAN mode - encryption
+		// `ngrok4com -serial` as `ngrok4com serial 7000` LAN mode - encryption
 		com()
 	}
 
