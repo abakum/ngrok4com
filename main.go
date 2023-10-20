@@ -1,7 +1,18 @@
+// git clone github.com/abakum/ngrok4com
+
+// go install github.com/dixonwille/wmenu/v5
+// go install github.com/xlab/closer
+// go install github.com/f1bonacc1/glippy
 // go install github.com/tc-hib/go-winres@latest
+// go install go.bug.st/serial
+// go install golang.ngrok.com/ngrok
+// go install golang.org/x/sync
+// go install gopkg.in/ini.v1
+
 // go-winres init
 // git tag v0.1.1-lw
 // git push origin --tags
+
 package main
 
 import (
