@@ -1,4 +1,4 @@
-# ngrok4com![ngrok4com](winres\icon32.png )
+# ngrok4com![ngrok4com](winres/icon32.png)
 
 ngrok4com is hub4com GUI and KiTTY helper for configuring remote devices by serial port<br>
 Helps KiTTY communicate with a hub4com over firewalls via ngrok.com<br>
@@ -6,11 +6,11 @@ Helps KiTTY communicate with a hub4com over firewalls via ngrok.com<br>
 
 ## Credits
 
-- Vyacheslav Frolov - for [com0com and hub4com](https://com0com.sourceforge.net) ![com](winres\com.png)
-- Simon Tatham, Cyril Dupont - for [KiTTY](https://github.com/cyd01/KiTTY) ![KiTTY](winres\KiTTY.png)
+- Vyacheslav Frolov - for [com0com and hub4com](https://com0com.sourceforge.net) ![com](winres/com.png)
+- Simon Tatham, Cyril Dupont - for [KiTTY](https://github.com/cyd01/KiTTY) ![KiTTY](winres/KiTTY.png)
 - ngrok - for [ngrok](https://github.com/ngrok/ngrok-go) ![ngrok](winres\ngrok.png)
-- Balázs Szalkai - for [Greenfish Icon Editor Pro](http://greenfishsoftware.org/gfie.php) ![gfie](winres\gfie.png )
-- Katayama Hirofumi MZ - for [RisohEditor](https://github.com/katahiromz/RisohEditor) ![re](winres\re.png )
+- Balázs Szalkai - for [Greenfish Icon Editor Pro](http://greenfishsoftware.org/gfie.php) ![gfie](winres/gfie.png )
+- Katayama Hirofumi MZ - for [RisohEditor](https://github.com/katahiromz/RisohEditor) ![re](winres/re.png )
 
 ## Usage:
 
