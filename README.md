@@ -1,4 +1,4 @@
-# ngrok4com![ngrok4com](winres/icon32.png )
+# ngrok4com![ngrok4com](winres\icon32.png )
 
 ngrok4com is hub4com GUI and KiTTY helper for configuring remote devices by serial port<br>
 Helps KiTTY communicate with a hub4com over firewalls via ngrok.com<br>
