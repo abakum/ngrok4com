@@ -5,7 +5,7 @@ hub4com GUI and KiTTY helper for configuring remote devices via ngrok by serial 
 ## Credits
 
 - Vyacheslav Frolov - for [com0com and hub4com](https://com0com.sourceforge.net)
-- Cyril Dupont - for [KiTTY](https://github.com/cyd01/KiTTY)
+- Simon Tatham, Cyril Dupont - for [KiTTY](https://github.com/cyd01/KiTTY)
 - ngrok - for [ngrok](https://github.com/ngrok/ngrok-go)
 
 ## Usage:
