@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dixonwille/wmenu/v5"
 	"github.com/xlab/closer"
 	"go.bug.st/serial/enumerator"
@@ -125,12 +126,12 @@ func com() {
 	time.Sleep(time.Second)
 
 	if NGROK_AUTHTOKEN == "" {
-		planB(Errorf("empty NGROK_AUTHTOKEN"), ":"+port)
+		planB(Errorf("empty NGROK_AUTHTOKEN"))
 		return
 	}
 
 	if errNgrok == nil {
-		planB(Errorf("found online client: %s", forwardsTo), ":"+port)
+		planB(Errorf("found online client: %s", forwardsTo))
 		return
 	}
 	err = nil
@@ -148,36 +149,89 @@ func com() {
 		PrintOk(cmd("Close", hub), err)
 	} else {
 		_ = ngrokBin
+		go watch(true)
 		err = run(context.Background(), ":"+port, false)
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
-			planB(err, ":"+port)
+			planB(err)
 			err = nil
 		}
 	}
 }
 
-func watch(dest string) {
-	withForwardsTo(dest)
-	for {
-		time.Sleep(TO)
-		if netstat("-a", dest, "") == "" {
-			li.Println("no listen ", dest)
-			break
-		}
-	}
-}
+// func watch_(dest string) {
+// 	withForwardsTo(dest)
+// 	for {
+// 		time.Sleep(TO)
+// 		if netstat("-a", dest, "") == "" {
+// 			li.Println("no listen ", dest)
+// 			break
+// 		}
+// 	}
+// }
 
-func planB(err error, dest string) {
+func planB(err error) {
 	let.Println(err)
 	li.Println("LAN mode - режим локальной сети")
-	watch(dest)
+	watch(false)
 }
 
 func withForwardsTo(lPort string) (meta string) {
 	meta = ifs + lPort
 	li.Println(meta)
 	return
+}
+
+// break or closer.Close() on `Stopped TCP`,
+// change input language on `Disconnect TCP` or `Changed TCP`
+func watch(close bool) {
+	old := -1
+	ste_ := ""
+	for {
+		time.Sleep(TOS)
+		ste := ""
+		new := netSt(func(s *netstat.SockTabEntry) bool {
+			ok := s.Process != nil && s.Process.Name == processName && (s.State == netstat.Listen || s.State == netstat.Established)
+			if ok {
+				// ltf.Println(hub4com, s.LocalAddr)
+				ste += fmt.Sprintln("\t", s.LocalAddr, s.RemoteAddr, s.State)
+			}
+			return ok
+		})
+		if new == 0 {
+			lt.Println("Stopped TCP")
+			if close {
+				closer.Close()
+			}
+			break
+		}
+		if old != new {
+			if old > new {
+				lt.Print("Disconnect TCP\n", ste)
+			} else {
+				if strings.Contains(ste, "ESTABLISHED") {
+					lt.Print("Established TCP\n", ste)
+				} else {
+					lt.Print("Listening TCP\n", ste)
+				}
+			}
+			ste_ = ste
+			old = new
+		}
+		if ste_ != ste {
+			lt.Print("Changed TCP\n", ste)
+			ste_ = ste
+		}
+	}
+}
+
+// func(s *netstat.SockTabEntry) bool {return s.State == a}
+func netSt(accept netstat.AcceptFn) int {
+	tabs, err := netstat.TCPSocks(accept)
+	if err != nil {
+		return 0
+	}
+	return len(tabs)
 }

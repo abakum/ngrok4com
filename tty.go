@@ -180,6 +180,7 @@ func tty() {
 	bBuffer.WriteTo(os.Stdout)
 	hub.Stdout = os.Stdout
 	hub.Stderr = os.Stderr
+	go watch(true)
 
 	for {
 		if baud != "" {
@@ -223,17 +224,6 @@ func tty() {
 		menu.Option(tit("0.08", commandDelay, false))
 		menu.Option(tit("9600", baud, baud == ""))
 
-		// menu.Option(DELAY, 0, commandDelay == DELAY, nil)
-		// menu.Option("115200", 1, baud == "115200", nil)
-		// menu.Option("0.2", 2, commandDelay == "0.2", nil)
-		// menu.Option("38400", 3, baud == "38400", nil)
-		// menu.Option("0.4", 4, commandDelay == "0.4", nil)
-		// menu.Option("57600", 5, baud == "57600", nil)
-		// menu.Option("0.6", 6, commandDelay == "0.6", nil)
-		// menu.Option("0.7", 7, commandDelay == "0.7", nil)
-		// menu.Option("0.08", 8, commandDelay == "0.08", nil)
-		// menu.Option("9600", 9, baud == "9600" || baud == "", nil)
-		// if !strings.Contains(",115200,38400,57600,9600,,", ","+baud+",") {
 		if !ok {
 			// menu.Option(baud, 10, true, nil)
 			menu.Option(tit(baud, baud, false))

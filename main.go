@@ -1,16 +1,17 @@
 // git clone github.com/abakum/ngrok4com
 
-// go install github.com/dixonwille/wmenu/v5
-// go install github.com/xlab/closer
-// go install github.com/f1bonacc1/glippy
+// go get github.com/dixonwille/wmenu/v5
+// go get github.com/xlab/closer
+// go get github.com/f1bonacc1/glippy
 // go install github.com/tc-hib/go-winres@latest
-// go install go.bug.st/serial
-// go install golang.ngrok.com/ngrok
-// go install golang.org/x/sync
-// go install gopkg.in/ini.v1
+// go get go.bug.st/serial
+// go get golang.ngrok.com/ngrok
+// go get golang.org/x/sync
+// go get gopkg.in/ini.v1
+// go get github.com/cakturk/go-netstat/netstat
 
 // go-winres init
-// git tag v0.1.1-lw
+// git tag v0.2.1-lw
 // git push origin --tags
 
 package main
@@ -42,6 +43,7 @@ const (
 	ITO   = "10"
 	XO    = "on"
 	DELAY = "0.05"
+	TOS   = time.Second * 7
 )
 
 var (
@@ -61,6 +63,7 @@ var (
 	commandDelay = DELAY
 	port         = "7000"
 	hub4com      = `hub4com.exe`
+	processName  = hub4com
 	kitty        = `kitty_portable.exe`
 	kittyINI     = `kitty.ini`
 	err,

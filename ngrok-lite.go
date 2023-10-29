@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -20,56 +19,6 @@ func cmd(s string, c *exec.Cmd) string {
 		return ""
 	}
 	return fmt.Sprintf(`%s "%s" %s`, s, c.Args[0], strings.Join(c.Args[1:], " "))
-}
-
-func ns(a string) string {
-	var (
-		err     error
-		bBuffer bytes.Buffer
-	)
-	opts := []string{
-		"-n",
-		"-p",
-		"TCP",
-		"-o",
-	}
-	if a != "" {
-		opts = append(opts, a)
-	}
-	stat := exec.Command("netstat", opts...)
-	stat.Stdout = &bBuffer
-	stat.Stderr = &bBuffer
-	err = stat.Run()
-	if err != nil {
-		PrintOk(cmd("Run", stat), err)
-		return ""
-	}
-	return bBuffer.String()
-}
-
-func nStat(all, a, host, pid string) (contains string) {
-	var (
-		err     error
-		bBuffer bytes.Buffer
-	)
-	ok := "LISTENING"
-	if a == "" {
-		ok = "ESTABLISHED"
-	}
-	bBuffer.WriteString(all)
-	for {
-		contains, err = bBuffer.ReadString('\n')
-		if err != nil {
-			return ""
-		}
-		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.Contains(contains, pid) {
-			return
-		}
-	}
-}
-
-func netstat(a, host, pid string) (contains string) {
-	return nStat(ns(a), a, host, pid)
 }
 
 // https://github.com/ngrok/ngrok-go/blob/main/examples/ngrok-lite/main.go

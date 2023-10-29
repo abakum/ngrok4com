@@ -25,6 +25,7 @@ require (
 )
 
 require (
+	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/dixonwille/wmenu/v5 v5.1.0
 	github.com/f1bonacc1/glippy v0.0.0-20230614190937-e7ca07f99f6f
 	github.com/xlab/closer v1.1.0
